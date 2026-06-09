@@ -6,7 +6,7 @@ Dirección General de Modernización e Investigación Territorial
 Municipalidad de Comodoro Rivadavia
 
 Uso:
-    python (en este caso el comando es 'py') creador_metadata.py --gpkg ruta/a/tu_archivo.gpkg
+    python creador_metadata.py --gpkg ruta/a/tu_archivo.gpkg
 
 Dependencias:
     pip install pygeometa
@@ -24,6 +24,7 @@ import os
 import argparse
 from datetime import date
 from pygeometa.schemas.iso19139 import ISO19139OutputSchema
+from pygeometa.core import read_mcf
 
 # ─────────────────────────────────────────────
 # CONFIGURACIÓN INSTITUCIONAL (campos fijos)
@@ -206,7 +207,8 @@ def generar_xml(mcf, nombre_capa, carpeta_salida):
     schema = ISO19139OutputSchema()
 
     try:
-        xml_string = schema.write(mcf)
+        mcf_parsed = read_mcf(mcf)
+        xml_string = schema.write(mcf_parsed)
         nombre_archivo = os.path.join(carpeta_salida, f"{nombre_capa}.xml")
 
         with open(nombre_archivo, "w", encoding="utf-8") as f:
