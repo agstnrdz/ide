@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Barrios - Población y densidad</title>
+  <style>html, body { margin:0; padding:0; }</style>
+</head>
+<body>
+
+<!-- ═══════════ COPIAR DESDE AQUÍ HASTA "FIN BLOQUE" EN ELEMENTOR (widget HTML) ═══════════ -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  /* Popups compactos: fuerza el mismo interlineado dentro de WordPress */
+  .leaflet-popup-content { line-height: 1.25 !important; margin: 8px 12px !important; }
+  .leaflet-popup-content p, .leaflet-popup-content b { line-height: 1.25 !important; margin: 0 !important; }
+</style>
+
+<div class="visor-geo" id="visor-poblacion" style="max-width:100%;font-family:system-ui,Segoe UI,Roboto,sans-serif;border:1px solid #e2dfe8;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+  <!-- Cabecera del visor: logo + título + descripción -->
+  <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;background:#134768;color:#fff;">
+    <div>
+      <div style="font-size:17px;font-weight:700;line-height:1.2;">Población y densidad por barrios</div>
+      <div style="font-size:12.5px;opacity:0.9;margin-top:2px;">Comodoro Rivadavia — 77 barrios. Hacé clic en cada barrio para ver población y densidad.</div>
+    </div>
+    <img src="https://agstnrdz.github.io/gestor-geoestadistico/assets/img/logotipo_MCR_DGMIT_blanco.png"
+         alt="Logo" style="height:44px;width:auto;flex-shrink:0;margin-left:auto;" onerror="this.style.display='none'">
+  </div>
+
+  <div id="map-poblacion" style="height:520px;"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://agstnrdz.github.io/gestor-geoestadistico/assets/data/barrios_data.js"></script>
+
+<script>
+(function () {
+  const map = L.map('map-poblacion').setView([-45.83448112101565, -67.49450745314675], 12);
+
+  // Mapa base: Argenmap (IGN)
+  L.tileLayer('https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capabaseargenmap@EPSG%3A3857@png/{z}/{x}/{-y}.png', {
+    attribution: 'Instituto Geográfico Nacional + OpenStreetMap | Fuente: INDEC, 2022. Procesamiento: Modernización e Investigación Territorial',
+    minZoom: 3,
+    maxZoom: 18
+  }).addTo(map);
+
+  const breaks = [0, 500, 1800, 5300, 8500];
+  const colors = ['#e8e0f5', '#c5aee8', '#9f7ed0', '#7b5ea7', '#4a2d7f'];
+  const nullColor = '#d0cdd6';
+
+  function getColor(val) {
+    if (val == null) return nullColor;
+    for (let i = breaks.length - 1; i >= 0; i--) if (val >= breaks[i]) return colors[i];
+    return colors[0];
+  }
+
+  const barriosLayer = L.geoJSON(BARRIOS_DATA, {
+    style: feat => ({
+      fillColor:   getColor(feat.properties.dens_pob),
+      fillOpacity: 0.75,
+      color:       '#070707',
+      weight:      1,
+      opacity:     0.5
+    }),
+    onEachFeature: (feat, layer) => {
+      const p = feat.properties;
+      const pob  = p.pob != null ? Number(p.pob).toLocaleString('es-AR') + ' hab.' : 'Sin dato';
+      const dens = p.dens_pob != null ? Number(p.dens_pob).toLocaleString('es-AR') + ' hab/km²' : 'Sin dato';
+      layer.bindPopup(`<b>${p.Nombre}</b><br>Población: ${pob}<br>Densidad: ${dens}`);
+      layer.on('mouseover', () => layer.setStyle({ fillOpacity: 0.75, weight: 3 }));
+      layer.on('mouseout',  () => layer.setStyle({ fillOpacity: 0.75, weight: 1 }));
+    }
+  }).addTo(map);
+
+  // Control para activar/desactivar la capa
+  L.control.layers(null, { 'Población y densidad': barriosLayer }, { collapsed: false }).addTo(map);
+
+  const legend = L.control({ position: 'bottomright' });
+  legend.onAdd = function () {
+    const div = L.DomUtil.create('div', 'info legend');
+    div.style.cssText = 'background:#fff;padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.5;box-shadow:0 1px 4px rgba(0,0,0,0.3)';
+    const labels = ['0 – 500', '500 – 1.800', '1.800 – 5.300', '5.300 – 8.500', '> 8.500'];
+    div.innerHTML = '<strong>Densidad (hab/km²)</strong><br>';
+    colors.forEach((c, i) => {
+      div.innerHTML += `<span style="display:inline-block;width:12px;height:12px;background:${c};margin-right:6px;border:1px solid #000"></span>${labels[i]}<br>`;
+    });
+    return div;
+  };
+  legend.addTo(map);
+})();
+</script>
+<!-- ═══════════ FIN BLOQUE ═══════════ -->
+
+</body>
+</html>

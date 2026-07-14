@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Barrios - Nivel de instrucción</title>
+  <style>html, body { margin:0; padding:0; }</style>
+</head>
+<body>
+
+<!-- ═══════════ COPIAR DESDE AQUÍ HASTA "FIN BLOQUE" EN ELEMENTOR (widget HTML) ═══════════ -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  /* Popups compactos: fuerza el mismo interlineado dentro de WordPress */
+  .leaflet-popup-content { line-height: 1.25 !important; margin: 8px 12px !important; }
+  .leaflet-popup-content p, .leaflet-popup-content b { line-height: 1.25 !important; margin: 0 !important; }
+  .leaflet-popup-content table td { line-height: 1.2 !important; padding-top: 0 !important; padding-bottom: 0 !important; }
+</style>
+
+<div class="visor-geo" id="visor-instruccion" style="max-width:100%;font-family:system-ui,Segoe UI,Roboto,sans-serif;border:1px solid #e2dfe8;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+  <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;background:#134768;color:#fff;">
+    <div>
+      <div style="font-size:17px;font-weight:700;line-height:1.2;">Nivel de instrucción por barrios</div>
+      <div style="font-size:12.5px;opacity:0.9;margin-top:2px;">Comodoro Rivadavia — 77 barrios. Elegí un indicador en el selector del mapa.</div>
+    </div>
+    <img src="https://agstnrdz.github.io/gestor-geoestadistico/assets/img/logotipo_MCR_DGMIT_blanco.png"
+         alt="Logo" style="height:44px;width:auto;flex-shrink:0;margin-left:auto;" onerror="this.style.display='none'">
+  </div>
+
+  <div id="map-instruccion" style="height:520px;"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://agstnrdz.github.io/gestor-geoestadistico/assets/data/barrios_nivel_instruccion_data.js"></script>
+
+<script>
+(function () {
+  const map = L.map('map-instruccion').setView([-45.83448112101565, -67.49450745314675], 12);
+
+  L.tileLayer('https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capabaseargenmap@EPSG%3A3857@png/{z}/{x}/{-y}.png', {
+    attribution: 'Instituto Geográfico Nacional + OpenStreetMap | Fuente: INDEC, 2022. Procesamiento: Modernización e Investigación Territorial',
+    minZoom: 3,
+    maxZoom: 18
+  }).addTo(map);
+
+  const CAMPOS = [
+    { key: 'sin_instruccion', label: 'Sin instrucción' },
+    { key: 'prim_incompleto', label: 'Primario incompleto' },
+    { key: 'prim_completo',   label: 'Primario completo' },
+    { key: 'sec_incompleto',  label: 'Secundario incompleto' },
+    { key: 'sec_completo',    label: 'Secundario completo' },
+    { key: 'terc_incompleto', label: 'Terciario incompleto' },
+    { key: 'terc_completo',   label: 'Terciario completo' },
+    { key: 'univ_incompleto', label: 'Universitario incompleto' },
+    { key: 'univ_completo',   label: 'Universitario completo' },
+    { key: 'pos_incompleto',  label: 'Posgrado incompleto' },
+    { key: 'pos_completo',    label: 'Posgrado completo' }
+  ];
+
+  const INDICADORES = [
+    { key: 'sin_instruccion',   label: 'Sin instrucción',
+      campos: ['sin_instruccion'],
+      breaks: [8, 10, 12, 14],  labels: ['< 8 %', '8 – 10 %', '10 – 12 %', '12 – 14 %', '≥ 14 %'],
+      colores: ['#fee5d9', '#fcae91', '#fb6a4a', '#de2d26', '#a50f15'] },
+    { key: 'primario',          label: 'Nivel primario',
+      campos: ['prim_incompleto', 'prim_completo'],
+      breaks: [15, 22, 28, 35], labels: ['< 15 %', '15 – 22 %', '22 – 28 %', '28 – 35 %', '≥ 35 %'],
+      colores: ['#feedde', '#fdbe85', '#fd8d3c', '#e6550d', '#a63603'] },
+    { key: 'secundario',        label: 'Nivel secundario',
+      campos: ['sec_incompleto', 'sec_completo'],
+      breaks: [35, 42, 45, 48], labels: ['< 35 %', '35 – 42 %', '42 – 45 %', '45 – 48 %', '≥ 48 %'],
+      colores: ['#eff3ff', '#bdd7e7', '#6baed6', '#2171b5', '#084594'] },
+    { key: 'superior',          label: 'Nivel superior (terc/univ/pos)',
+      campos: ['terc_incompleto', 'terc_completo', 'univ_incompleto', 'univ_completo', 'pos_incompleto', 'pos_completo'],
+      breaks: [12, 20, 28, 38], labels: ['< 12 %', '12 – 20 %', '20 – 28 %', '28 – 38 %', '≥ 38 %'],
+      colores: ['#edf8e9', '#bae4b3', '#74c476', '#31a354', '#006d2c'] },
+    { key: 'superior_completo', label: 'Superior completo',
+      campos: ['terc_completo', 'univ_completo', 'pos_completo'],
+      breaks: [4, 7, 12, 20],   labels: ['< 4 %', '4 – 7 %', '7 – 12 %', '12 – 20 %', '≥ 20 %'],
+      colores: ['#f2f0f7', '#cbc9e2', '#9e9ac8', '#756bb1', '#54278f'] }
+  ];
+
+  const nullColor = '#d0cdd6';
+  let indActivo = INDICADORES.find(i => i.key === 'secundario');
+
+  const calcTotal = p => CAMPOS.reduce((s, c) => s + (p[c.key] || 0), 0);
+  function calcPct(p, ind) {
+    const total = calcTotal(p);
+    if (!total) return null;
+    return ind.campos.reduce((s, k) => s + (p[k] || 0), 0) / total * 100;
+  }
+  function getColor(pct, ind) {
+    if (pct === null) return nullColor;
+    for (let i = ind.breaks.length - 1; i >= 0; i--) if (pct >= ind.breaks[i]) return ind.colores[i + 1];
+    return ind.colores[0];
+  }
+  const estilo = feat => ({
+    fillColor:   getColor(calcPct(feat.properties, indActivo), indActivo),
+    fillOpacity: 0.75,
+    color:       '#070707',
+    weight:      1,
+    opacity:     0.5
+  });
+
+  function makePopup(p) {
+    const total = calcTotal(p);
+    const filas = CAMPOS.map(c => {
+      const v = p[c.key] || 0;
+      const pct = total ? (v / total * 100).toFixed(1) : '—';
+      return `<tr><td style="padding:1px 8px 1px 0;color:#555">${c.label}</td><td style="text-align:right">${v.toLocaleString('es-AR')} <span style="color:#999">(${pct}%)</span></td></tr>`;
+    }).join('');
+    return `<b>${p.nombre}</b><br>Total relevado: ${total.toLocaleString('es-AR')} personas<table style="font-size:11px;margin-top:4px;border-collapse:collapse">${filas}</table>`;
+  }
+
+  const capa = L.geoJSON(BARRIOS_NIVEL_INSTRUCCION_DATA, {
+    style: estilo,
+    onEachFeature: (feat, layer) => {
+      layer.bindPopup(makePopup(feat.properties), { maxWidth: 320 });
+      layer.on('mouseover', () => layer.setStyle({ fillOpacity: 0.75, weight: 3 }));
+      layer.on('mouseout',  () => layer.setStyle(estilo(feat)));
+    }
+  }).addTo(map);
+
+  // Control para activar/desactivar la capa
+  L.control.layers(null, { 'Nivel de instrucción': capa }, { collapsed: false }).addTo(map);
+
+  // Selector de indicador (arriba a la derecha)
+  const selector = L.control({ position: 'topright' });
+  selector.onAdd = function () {
+    const div = L.DomUtil.create('div');
+    div.style.cssText = 'background:#fff;padding:6px 8px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.3)';
+    const opts = INDICADORES.map(i => `<option value="${i.key}"${i.key === indActivo.key ? ' selected' : ''}>${i.label}</option>`).join('');
+    div.innerHTML = `<select id="sel-indicador" style="font-size:12px;max-width:200px">${opts}</select>`;
+    L.DomEvent.disableClickPropagation(div);
+    return div;
+  };
+  selector.addTo(map);
+
+  // Leyenda dinámica
+  const legend = L.control({ position: 'bottomright' });
+  legend.onAdd = function () {
+    const div = L.DomUtil.create('div', 'info legend');
+    div.id = 'leyenda-instruccion';
+    div.style.cssText = 'background:#fff;padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.5;box-shadow:0 1px 4px rgba(0,0,0,0.3)';
+    return div;
+  };
+  legend.addTo(map);
+
+  function updateLeyenda() {
+    const div = document.getElementById('leyenda-instruccion');
+    div.innerHTML = `<strong>${indActivo.label} (%)</strong><br>`;
+    indActivo.colores.forEach((c, i) => {
+      div.innerHTML += `<span style="display:inline-block;width:12px;height:12px;background:${c};margin-right:6px;border:1px solid #999"></span>${indActivo.labels[i]}<br>`;
+    });
+    div.innerHTML += `<span style="display:inline-block;width:12px;height:12px;background:${nullColor};margin-right:6px;border:1px solid #999"></span>Sin dato<br>`;
+  }
+  updateLeyenda();
+
+  document.getElementById('sel-indicador').addEventListener('change', function () {
+    indActivo = INDICADORES.find(i => i.key === this.value);
+    capa.setStyle(estilo);
+    updateLeyenda();
+  });
+})();
+</script>
+<!-- ═══════════ FIN BLOQUE ═══════════ -->
+
+</body>
+</html>
