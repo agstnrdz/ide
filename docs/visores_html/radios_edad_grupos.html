@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Radios censales - Grupos de edad</title>
+  <style>html, body { margin:0; padding:0; }</style>
+</head>
+<body>
+
+<!-- ═══════════ COPIAR DESDE AQUÍ HASTA "FIN BLOQUE" EN ELEMENTOR (widget HTML) ═══════════ -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  /* Popups compactos: fuerza el mismo interlineado dentro de WordPress */
+  .leaflet-popup-content { line-height: 1.25 !important; margin: 8px 12px !important; }
+  .leaflet-popup-content p, .leaflet-popup-content b { line-height: 1.25 !important; margin: 0 !important; }
+  .leaflet-popup-content table td { line-height: 1.2 !important; padding-top: 0 !important; padding-bottom: 0 !important; }
+</style>
+
+<div class="visor-geo" id="visor-edad-grupos" style="max-width:100%;font-family:system-ui,Segoe UI,Roboto,sans-serif;border:1px solid #e2dfe8;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+  <!-- Cabecera del visor: título + descripción + logo -->
+  <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;background:#134768;color:#fff;">
+    <div>
+      <div style="font-size:17px;font-weight:700;line-height:1.2;">Grupos de edad por radio censal</div>
+      <div style="font-size:12.5px;opacity:0.9;margin-top:2px;">Comodoro Rivadavia — 325 radios censales (Censo 2022). Elegí un indicador en el selector del mapa.</div>
+    </div>
+    <img src="https://agstnrdz.github.io/ide/assets/img/logotipo_MCR_DGMIT_blanco.png"
+         alt="Logo" style="height:44px;width:auto;flex-shrink:0;margin-left:auto;" onerror="this.style.display='none'">
+  </div>
+
+  <div id="map-edad-grupos" style="height:520px;"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://agstnrdz.github.io/ide/layers_censo_gpkg_geojson/layers_js/radios_edad_grupos_data.js"></script>
+
+<script>
+(function () {
+  const map = L.map('map-edad-grupos').setView([-45.83448112101565, -67.49450745314675], 12);
+
+  // Mapa base: Argenmap (IGN)
+  L.tileLayer('https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capabaseargenmap@EPSG%3A3857@png/{z}/{x}/{-y}.png', {
+    attribution: 'Instituto Geográfico Nacional + OpenStreetMap | Fuente: INDEC, 2022. Procesamiento: Modernización e Investigación Territorial',
+    minZoom: 3,
+    maxZoom: 18
+  }).addTo(map);
+
+  const GRUPOS = [
+    { key: 'pob_0_14',   label: '0 – 14 años' },
+    { key: 'pob_15_64',  label: '15 – 64 años' },
+    { key: 'pob_65_mas', label: '65 años y más' }
+  ];
+
+  const INDICADORES = [
+    { key: 'pct_0_14',  label: '% población 0 – 14 años',
+      valor: p => p.pob_total > 0 ? p.pob_0_14 / p.pob_total * 100 : null,
+      breaks: [18, 20, 23, 27], labels: ['< 18 %', '18 – 20 %', '20 – 23 %', '23 – 27 %', '≥ 27 %'],
+      colores: ['#edf8e9', '#bae4b3', '#74c476', '#31a354', '#006d2c'],
+      leyenda: '% población 0 – 14 años' },
+    { key: 'pct_15_64', label: '% población 15 – 64 años',
+      valor: p => p.pob_total > 0 ? p.pob_15_64 / p.pob_total * 100 : null,
+      breaks: [65, 67, 69, 71], labels: ['< 65 %', '65 – 67 %', '67 – 69 %', '69 – 71 %', '≥ 71 %'],
+      colores: ['#eff3ff', '#bdd7e7', '#6baed6', '#2171b5', '#084594'],
+      leyenda: '% población 15 – 64 años' },
+    { key: 'pct_65_mas', label: '% población 65 años y más',
+      valor: p => p.pob_total > 0 ? p.pob_65_mas / p.pob_total * 100 : null,
+      breaks: [4, 8, 12, 15], labels: ['< 4 %', '4 – 8 %', '8 – 12 %', '12 – 15 %', '≥ 15 %'],
+      colores: ['#f2f0f7', '#cbc9e2', '#9e9ac8', '#756bb1', '#54278f'],
+      leyenda: '% población 65 años y más' },
+    { key: 'densidad', label: 'Densidad de población',
+      valor: p => p.densidad,
+      breaks: [1500, 4000, 6000, 9500], labels: ['< 1.500', '1.500 – 4.000', '4.000 – 6.000', '6.000 – 9.500', '≥ 9.500'],
+      colores: ['#feedde', '#fdbe85', '#fd8d3c', '#e6550d', '#a63603'],
+      leyenda: 'Densidad (hab/km²)' }
+  ];
+
+  const nullColor = '#d0cdd6';
+  let indActivo = INDICADORES[0];
+
+  function getColor(val, ind) {
+    if (val == null || isNaN(val)) return nullColor;
+    for (let i = ind.breaks.length - 1; i >= 0; i--) if (val >= ind.breaks[i]) return ind.colores[i + 1];
+    return ind.colores[0];
+  }
+
+  const estilo = feat => ({
+    fillColor:   getColor(indActivo.valor(feat.properties), indActivo),
+    fillOpacity: 0.75,
+    color:       '#070707',
+    weight:      1,
+    opacity:     0.5
+  });
+
+  const fmt = v => v != null ? Number(v).toLocaleString('es-AR', { maximumFractionDigits: 1 }) : 'Sin dato';
+
+  function makePopup(p) {
+    const filas = GRUPOS.map(g => {
+      const v = p[g.key] || 0;
+      const pct = p.pob_total > 0 ? (v / p.pob_total * 100).toFixed(1) : '—';
+      return `<tr><td style="padding:1px 8px 1px 0;color:#555">${g.label}</td><td style="text-align:right">${fmt(v)} <span style="color:#999">(${pct}%)</span></td></tr>`;
+    }).join('');
+    return `<b>Radio censal ${p.geo_id}</b><br>` +
+      `Población total: ${fmt(p.pob_total)} hab.` +
+      `<table style="font-size:11px;margin-top:4px;border-collapse:collapse">${filas}</table>` +
+      `Superficie: ${fmt(p.area_km2)} km²<br>` +
+      `Densidad: ${fmt(p.densidad)} hab/km²`;
+  }
+
+  const capa = L.geoJSON(window.RADIOS_EDAD_GRUPOS_DATA, {
+    style: estilo,
+    onEachFeature: (feat, layer) => {
+      layer.bindPopup(makePopup(feat.properties), { maxWidth: 300 });
+      layer.on('mouseover', () => layer.setStyle({ fillOpacity: 0.75, weight: 3 }));
+      layer.on('mouseout',  () => layer.setStyle(estilo(feat)));
+    }
+  }).addTo(map);
+
+  // Control para activar/desactivar la capa
+  L.control.layers(null, { 'Grupos de edad': capa }, { collapsed: false }).addTo(map);
+
+  // Selector de indicador (arriba a la derecha)
+  const selector = L.control({ position: 'topright' });
+  selector.onAdd = function () {
+    const div = L.DomUtil.create('div');
+    div.style.cssText = 'background:#fff;padding:6px 8px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.3)';
+    const opts = INDICADORES.map(i => `<option value="${i.key}"${i.key === indActivo.key ? ' selected' : ''}>${i.label}</option>`).join('');
+    div.innerHTML = `<select id="sel-indicador-edad" style="font-size:12px;max-width:210px">${opts}</select>`;
+    L.DomEvent.disableClickPropagation(div);
+    return div;
+  };
+  selector.addTo(map);
+
+  // Leyenda dinámica
+  const legend = L.control({ position: 'bottomright' });
+  legend.onAdd = function () {
+    const div = L.DomUtil.create('div', 'info legend');
+    div.id = 'leyenda-edad-grupos';
+    div.style.cssText = 'background:#fff;padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.5;box-shadow:0 1px 4px rgba(0,0,0,0.3)';
+    return div;
+  };
+  legend.addTo(map);
+
+  function updateLeyenda() {
+    const div = document.getElementById('leyenda-edad-grupos');
+    div.innerHTML = `<strong>${indActivo.leyenda}</strong><br>`;
+    indActivo.colores.forEach((c, i) => {
+      div.innerHTML += `<span style="display:inline-block;width:12px;height:12px;background:${c};margin-right:6px;border:1px solid #999"></span>${indActivo.labels[i]}<br>`;
+    });
+    div.innerHTML += `<span style="display:inline-block;width:12px;height:12px;background:${nullColor};margin-right:6px;border:1px solid #999"></span>Sin dato<br>`;
+  }
+  updateLeyenda();
+
+  document.getElementById('sel-indicador-edad').addEventListener('change', function () {
+    indActivo = INDICADORES.find(i => i.key === this.value);
+    capa.setStyle(estilo);
+    updateLeyenda();
+  });
+})();
+</script>
+<!-- ═══════════ FIN BLOQUE ═══════════ -->
+
+</body>
+</html>

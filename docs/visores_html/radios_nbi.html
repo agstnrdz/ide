@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Radios censales - Hogares con NBI</title>
+  <style>html, body { margin:0; padding:0; }</style>
+</head>
+<body>
+
+<!-- ═══════════ COPIAR DESDE AQUÍ HASTA "FIN BLOQUE" EN ELEMENTOR (widget HTML) ═══════════ -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  /* Popups compactos: fuerza el mismo interlineado dentro de WordPress */
+  .leaflet-popup-content { line-height: 1.25 !important; margin: 8px 12px !important; }
+  .leaflet-popup-content p, .leaflet-popup-content b { line-height: 1.25 !important; margin: 0 !important; }
+  .leaflet-popup-content table td { line-height: 1.2 !important; padding-top: 0 !important; padding-bottom: 0 !important; }
+</style>
+
+<div class="visor-geo" id="visor-nbi" style="max-width:100%;font-family:system-ui,Segoe UI,Roboto,sans-serif;border:1px solid #e2dfe8;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+  <!-- Cabecera del visor: título + descripción + logo -->
+  <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;background:#134768;color:#fff;">
+    <div>
+      <div style="font-size:17px;font-weight:700;line-height:1.2;">Hogares con NBI por radio censal</div>
+      <div style="font-size:12.5px;opacity:0.9;margin-top:2px;">Comodoro Rivadavia — 325 radios censales (Censo 2022). Necesidades Básicas Insatisfechas por hogar.</div>
+    </div>
+    <img src="https://agstnrdz.github.io/ide/assets/img/logotipo_MCR_DGMIT_blanco.png"
+         alt="Logo" style="height:44px;width:auto;flex-shrink:0;margin-left:auto;" onerror="this.style.display='none'">
+  </div>
+
+  <div id="map-nbi" style="height:520px;"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://agstnrdz.github.io/ide/layers_censo_gpkg_geojson/layers_js/radios_nbi_data.js"></script>
+
+<script>
+(function () {
+  const map = L.map('map-nbi').setView([-45.83448112101565, -67.49450745314675], 12);
+
+  // Mapa base: Argenmap (IGN)
+  L.tileLayer('https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capabaseargenmap@EPSG%3A3857@png/{z}/{x}/{-y}.png', {
+    attribution: 'Instituto Geográfico Nacional + OpenStreetMap | Fuente: INDEC, 2022. Procesamiento: Modernización e Investigación Territorial',
+    minZoom: 3,
+    maxZoom: 18
+  }).addTo(map);
+
+  const breaks = [2, 4, 6, 9];
+  const colors = ['#fee5d9', '#fcae91', '#fb6a4a', '#de2d26', '#a50f15'];
+  const labels = ['< 2 %', '2 – 4 %', '4 – 6 %', '6 – 9 %', '≥ 9 %'];
+  const nullColor = '#d0cdd6';
+
+  function getColor(val) {
+    if (val == null || isNaN(val)) return nullColor;
+    for (let i = breaks.length - 1; i >= 0; i--) if (val >= breaks[i]) return colors[i + 1];
+    return colors[0];
+  }
+
+  // Valor que pinta la coropleta
+  function valor(p) {
+    return p.hogares > 0 ? p.nbi_si / p.hogares * 100 : null;
+  }
+
+  const fmt = v => v != null ? Number(v).toLocaleString('es-AR', { maximumFractionDigits: 1 }) : 'Sin dato';
+  const pct = (v, t) => (t > 0 && v != null) ? (v / t * 100).toFixed(1) + '%' : '—';
+
+  function makePopup(p) {
+    const pNbi = pct(p.nbi_si, p.hogares);
+    return `<b>Radio censal ${p.geo_id}</b><br>` +
+      `Hogares con NBI: ${fmt(p.nbi_si)} (${pNbi})<br>` +
+      `Hogares sin NBI: ${fmt(p.nbi_no)}<br>` +
+      `Total de hogares: ${fmt(p.hogares)}<br>` +
+      `Densidad de hogares NBI: ${fmt(p.dens_nbi)} hog/km²`;
+  }
+
+  const estilo = feat => ({
+    fillColor:   getColor(valor(feat.properties)),
+    fillOpacity: 0.75,
+    color:       '#070707',
+    weight:      1,
+    opacity:     0.5
+  });
+
+  const capa = L.geoJSON(window.RADIOS_NBI_DATA, {
+    style: estilo,
+    onEachFeature: (feat, layer) => {
+      layer.bindPopup(makePopup(feat.properties), { maxWidth: 300 });
+      layer.on('mouseover', () => layer.setStyle({ fillOpacity: 0.75, weight: 3 }));
+      layer.on('mouseout',  () => layer.setStyle(estilo(feat)));
+    }
+  }).addTo(map);
+
+  // Control para activar/desactivar la capa
+  L.control.layers(null, { 'Hogares con NBI': capa }, { collapsed: false }).addTo(map);
+
+  // Leyenda
+  const legend = L.control({ position: 'bottomright' });
+  legend.onAdd = function () {
+    const div = L.DomUtil.create('div', 'info legend');
+    div.style.cssText = 'background:#fff;padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.5;box-shadow:0 1px 4px rgba(0,0,0,0.3)';
+    div.innerHTML = '<strong>% de hogares con NBI</strong><br>';
+    colors.forEach((c, i) => {
+      div.innerHTML += `<span style="display:inline-block;width:12px;height:12px;background:${c};margin-right:6px;border:1px solid #999"></span>${labels[i]}<br>`;
+    });
+    div.innerHTML += `<span style="display:inline-block;width:12px;height:12px;background:${nullColor};margin-right:6px;border:1px solid #999"></span>Sin dato<br>`;
+    return div;
+  };
+  legend.addTo(map);
+})();
+</script>
+<!-- ═══════════ FIN BLOQUE ═══════════ -->
+
+</body>
+</html>
