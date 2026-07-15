@@ -70,11 +70,18 @@ PLANTILLA = """<!DOCTYPE html>
   const map = L.map('map-{id}').setView({centro}, {zoom});
 
   // Mapa base: Argenmap (IGN)
-  L.tileLayer('https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capabaseargenmap@EPSG%3A3857@png/{{z}}/{{x}}/{{-y}}.png', {{
+  const argenmap = L.tileLayer('https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capabaseargenmap@EPSG%3A3857@png/{{z}}/{{x}}/{{-y}}.png', {{
     attribution: '{attrib}',
     minZoom: 3,
     maxZoom: 18
   }}).addTo(map);
+
+  // Mapa base: Satélite (Google)
+  const satelite = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={{x}}&y={{y}}&z={{z}}', {{
+    attribution: 'Imágenes © Google | Fuente: INDEC, 2022. Procesamiento: Modernización e Investigación Territorial',
+    minZoom: 3,
+    maxZoom: 20
+  }});
 
   const breaks = {breaks};
   const colors = {colors};
@@ -116,8 +123,12 @@ PLANTILLA = """<!DOCTYPE html>
     }}
   }}).addTo(map);
 
-  // Control para activar/desactivar la capa
-  L.control.layers(null, {{ '{capa_label}': capa }}, {{ collapsed: false }}).addTo(map);
+  // Control de capas: mapas base (excluyentes) + capa de datos
+  L.control.layers(
+    {{ 'Argenmap (IGN)': argenmap, 'Satélite (Google)': satelite }},
+    {{ '{capa_label}': capa }},
+    {{ collapsed: false }}
+  ).addTo(map);
 
   // Leyenda
   const legend = L.control({{ position: 'bottomright' }});

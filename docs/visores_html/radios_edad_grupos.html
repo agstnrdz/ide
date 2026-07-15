@@ -23,7 +23,7 @@
   <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;background:#134768;color:#fff;">
     <div>
       <div style="font-size:17px;font-weight:700;line-height:1.2;">Grupos de edad por radio censal</div>
-      <div style="font-size:12.5px;opacity:0.9;margin-top:2px;">Comodoro Rivadavia — 325 radios censales (Censo 2022). Elegí un indicador en el selector del mapa.</div>
+      <div style="font-size:12.5px;opacity:0.9;margin-top:2px;">Comodoro Rivadavia. 325 radios censales (Censo 2022). Elegí un indicador en el selector del mapa</div>
     </div>
     <img src="https://agstnrdz.github.io/ide/assets/img/logotipo_MCR_DGMIT_blanco.png"
          alt="Logo" style="height:44px;width:auto;flex-shrink:0;margin-left:auto;" onerror="this.style.display='none'">
@@ -40,11 +40,18 @@
   const map = L.map('map-edad-grupos').setView([-45.83448112101565, -67.49450745314675], 12);
 
   // Mapa base: Argenmap (IGN)
-  L.tileLayer('https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capabaseargenmap@EPSG%3A3857@png/{z}/{x}/{-y}.png', {
+  const argenmap = L.tileLayer('https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capabaseargenmap@EPSG%3A3857@png/{z}/{x}/{-y}.png', {
     attribution: 'Instituto Geográfico Nacional + OpenStreetMap | Fuente: INDEC, 2022. Procesamiento: Modernización e Investigación Territorial',
     minZoom: 3,
     maxZoom: 18
   }).addTo(map);
+
+  // Mapa base: Satélite (Google)
+  const satelite = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+    attribution: 'Imágenes © Google | Fuente: INDEC, 2022. Procesamiento: Modernización e Investigación Territorial',
+    minZoom: 3,
+    maxZoom: 20
+  });
 
   const GRUPOS = [
     { key: 'pob_0_14',   label: '0 – 14 años' },
@@ -116,8 +123,12 @@
     }
   }).addTo(map);
 
-  // Control para activar/desactivar la capa
-  L.control.layers(null, { 'Grupos de edad': capa }, { collapsed: false }).addTo(map);
+  // Control de capas: mapas base (excluyentes) + capa de datos
+  L.control.layers(
+    { 'Argenmap (IGN)': argenmap, 'Satélite (Google)': satelite },
+    { 'Grupos de edad': capa },
+    { collapsed: false }
+  ).addTo(map);
 
   // Selector de indicador (arriba a la derecha)
   const selector = L.control({ position: 'topright' });
