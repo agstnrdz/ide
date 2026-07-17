@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Transporte Público — Comodoro Rivadavia · Líneas y paradas</title>
+<meta name="description" content="Mapa interactivo de las líneas de colectivo y paradas de transporte público de Comodoro Rivadavia sobre cartografía ARGENMAP (IGN).">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='3' width='18' height='14' rx='3' fill='%232a78d6'/%3E%3Crect x='5.5' y='6' width='5' height='4' rx='1' fill='white'/%3E%3Crect x='13.5' y='6' width='5' height='4' rx='1' fill='white'/%3E%3Ccircle cx='7.5' cy='19' r='2' fill='%230b0b0b'/%3E%3Ccircle cx='16.5' cy='19' r='2' fill='%230b0b0b'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   Visor de transporte público — Comodoro Rivadavia
+   Tokens de tema + layout + componentes
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+  --panel:        #fcfcfb;
+  --page:         #f9f9f7;
+  --ink-1:        #0b0b0b;
+  --ink-2:        #52514e;
+  --muted:        #898781;
+  --hair:         #e1e0d9;
+  --hover-wash:   rgba(11, 11, 11, 0.05);
+  --activo-bg:    #0b0b0b;
+  --activo-fg:    #fcfcfb;
+  --sombra:       0 10px 30px rgba(11, 11, 11, 0.14);
+  --mapa-fondo:   #e8e6e0;
+  --geoloc:       #2a78d6;
+  --ok:           #0ca30c;
+}
+:root[data-theme="dark"] {
+  --panel:        #1a1a19;
+  --page:         #0d0d0d;
+  --ink-1:        #ffffff;
+  --ink-2:        #c3c2b7;
+  --muted:        #898781;
+  --hair:         #2c2c2a;
+  --hover-wash:   rgba(255, 255, 255, 0.07);
+  --activo-bg:    #ffffff;
+  --activo-fg:    #0d0d0d;
+  --sombra:       0 10px 30px rgba(0, 0, 0, 0.55);
+  --mapa-fondo:   #141414;
+  --geoloc:       #3987e5;
+  --ok:           #0ca30c;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--ink-1);
+  background: var(--page);
+  overflow: hidden;
+}
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--geoloc); outline-offset: 2px; }
+a { color: inherit; }
+
+#app { display: flex; height: 100%; }
+
+/* ══════════ Panel lateral ══════════ */
+#panel {
+  width: 342px;
+  min-width: 342px;
+  height: 100%;
+  background: var(--panel);
+  border-right: 1px solid var(--hair);
+  display: flex;
+  flex-direction: column;
+  z-index: 1200;
+  transition: transform 0.28s ease;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px 10px;
+}
+.brand { display: flex; align-items: center; gap: 11px; }
+.brand-icon { color: var(--ink-1); display: grid; place-items: center; }
+.brand-text h1 { margin: 0; font-size: 19px; font-weight: 750; letter-spacing: -0.02em; line-height: 1.1; }
+.brand-text p  { margin: 1px 0 0; font-size: 12.5px; color: var(--ink-2); }
+
+.btn-icono {
+  width: 34px; height: 34px;
+  display: grid; place-items: center;
+  border-radius: 9px;
+  border: 1px solid var(--hair);
+  transition: background 0.15s;
+}
+.btn-icono:hover { background: var(--hover-wash); }
+:root[data-theme="dark"] .icono-luna { display: none; }
+:root:not([data-theme="dark"]) .icono-sol { display: none; }
+
+.stats-row {
+  margin: 2px 16px 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--ink-2);
+  background: var(--hover-wash);
+  border-radius: 9px;
+  display: flex;
+  justify-content: space-between;
+}
+.stats-row strong { color: var(--ink-1); font-weight: 700; }
+
+.panel-scroll { flex: 1; overflow-y: auto; padding: 0 8px 12px; scrollbar-width: thin; }
+
+.seccion { padding: 8px 8px 4px; }
+.seccion-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 2px;
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+  z-index: 5;
+}
+.seccion-head h2 {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+}
+.ayuda { margin: 2px 2px 8px; font-size: 11.5px; line-height: 1.45; color: var(--muted); }
+
+.mini-acciones { display: flex; gap: 6px; }
+.btn-mini {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--hair);
+  color: var(--ink-2);
+}
+.btn-mini:hover { background: var(--hover-wash); color: var(--ink-1); }
+
+/* ── Lista de líneas ── */
+#lista-lineas { list-style: none; margin: 0; padding: 0; }
+.linea-row {
+  border-radius: 11px;
+  margin-bottom: 2px;
+  transition: background 0.15s;
+}
+.linea-row:hover { background: var(--hover-wash); }
+.linea-row.enfocada { background: var(--hover-wash); box-shadow: inset 0 0 0 1.5px var(--ink-1); }
+.linea-row.oculta .chip { filter: grayscale(1); opacity: 0.35; }
+.linea-row.oculta .linea-nombre { color: var(--muted); }
+
+.linea-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.chip {
+  min-width: 34px; height: 26px;
+  padding: 0 5px;
+  display: grid; place-items: center;
+  border-radius: 8px;
+  background: var(--c);
+  color: var(--chip-fg, #fff);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+.linea-row:hover .chip { transform: scale(1.07); }
+.linea-nombre {
+  flex: 1;
+  font-size: 12.8px;
+  font-weight: 550;
+  line-height: 1.25;
+  color: var(--ink-1);
+}
+.btn-ojo {
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  border-radius: 8px;
+  color: var(--muted);
+  opacity: 0.55;
+  transition: opacity 0.15s, background 0.15s;
+}
+.linea-row:hover .btn-ojo, .btn-ojo:focus-visible { opacity: 1; }
+.btn-ojo:hover { background: var(--hover-wash); color: var(--ink-1); }
+
+.linea-detalle {
+  display: none;
+  padding: 0 8px 9px 52px;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.linea-row.enfocada .linea-detalle { display: flex; }
+.pill {
+  font-size: 11.5px;
+  font-weight: 650;
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 1.5px solid var(--hair);
+  color: var(--muted);
+  transition: all 0.15s;
+}
+.pill.activo {
+  background: var(--activo-bg);
+  color: var(--activo-fg);
+  border-color: var(--activo-bg);
+}
+.detalle-cartel {
+  width: 100%;
+  font-size: 11px;
+  color: var(--muted);
+  margin: 2px 0 0;
+}
+
+/* ── Switch ── */
+.switch { position: relative; display: inline-block; }
+.switch input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.switch-track {
+  display: block;
+  width: 36px; height: 20px;
+  border-radius: 999px;
+  background: var(--hair);
+  transition: background 0.18s;
+  pointer-events: none;
+}
+.switch-track::after {
+  content: "";
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--panel);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  transition: transform 0.18s;
+}
+.switch input:checked + .switch-track { background: var(--activo-bg); }
+.switch input:checked + .switch-track::after { transform: translateX(16px); }
+.switch input:focus-visible + .switch-track { outline: 2px solid var(--geoloc); outline-offset: 2px; }
+
+/* ── Filtros de paradas ── */
+.filtro-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 2px;
+}
+.filtro-nombre { font-size: 12.5px; font-weight: 550; }
+.segmentado {
+  display: flex;
+  border: 1px solid var(--hair);
+  border-radius: 9px;
+  overflow: hidden;
+}
+.seg {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 4px 10px;
+  color: var(--muted);
+  border-right: 1px solid var(--hair);
+}
+.seg:last-child { border-right: none; }
+.seg:hover { background: var(--hover-wash); color: var(--ink-1); }
+.seg.activo { background: var(--activo-bg); color: var(--activo-fg); }
+#conteo-paradas {
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--ink-2);
+  padding: 6px 10px;
+  background: var(--hover-wash);
+  border-radius: 8px;
+}
+#conteo-paradas strong { color: var(--ink-1); }
+#seccion-paradas.apagada #filtros-paradas { opacity: 0.35; pointer-events: none; }
+
+.panel-footer {
+  padding: 12px 16px 12px;
+  border-top: 1px solid var(--hair);
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.panel-footer p { margin: 0; }
+
+/* ══════════ Mapa ══════════ */
+#mapa { flex: 1; height: 100%; background: var(--mapa-fondo); z-index: 1; }
+
+/* líneas: flujo animado de sentido */
+.linea-flujo { animation: flujo 0.9s linear infinite; }
+@keyframes flujo {
+  from { stroke-dashoffset: 18; }
+  to   { stroke-dashoffset: 0; }
+}
+
+/* punto viajero */
+.dot-viajero-halo { animation: pulso-halo 1.6s ease-out infinite; }
+@keyframes pulso-halo {
+  0%   { stroke-opacity: 0.55; }
+  50%  { stroke-opacity: 0.15; }
+  100% { stroke-opacity: 0.55; }
+}
+
+/* geolocalización */
+.geo-halo { animation: pulso-halo 2s ease-out infinite; }
+
+/* controles Leaflet tematizados */
+.leaflet-bar a, .leaflet-bar a:hover {
+  background: var(--panel);
+  color: var(--ink-1);
+  border-bottom-color: var(--hair);
+}
+.leaflet-bar a:hover { background: var(--hover-wash); }
+.leaflet-control-attribution {
+  background: color-mix(in srgb, var(--panel) 85%, transparent) !important;
+  color: var(--muted) !important;
+  font-size: 10px !important;
+}
+.leaflet-control-attribution a { color: var(--ink-2) !important; }
+.leaflet-control-scale-line {
+  background: color-mix(in srgb, var(--panel) 80%, transparent);
+  color: var(--ink-2);
+  border-color: var(--muted);
+}
+
+/* control personalizado: base + acciones */
+.ctrl-mapa {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+.ctrl-grupo {
+  display: flex;
+  background: var(--panel);
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.22);
+  overflow: hidden;
+  border: 1px solid var(--hair);
+}
+.ctrl-grupo button {
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--muted);
+  border-right: 1px solid var(--hair);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ctrl-grupo button:last-child { border-right: none; }
+.ctrl-grupo button:hover { background: var(--hover-wash); color: var(--ink-1); }
+.ctrl-grupo button.activo { background: var(--activo-bg); color: var(--activo-fg); }
+.ctrl-grupo.vertical { flex-direction: column; }
+.ctrl-grupo.vertical button {
+  border-right: none;
+  border-bottom: 1px solid var(--hair);
+  justify-content: center;
+  padding: 9px 10px;
+}
+.ctrl-grupo.vertical button:last-child { border-bottom: none; }
+
+/* tooltips y popups */
+.leaflet-tooltip.tt-linea, .leaflet-tooltip.tt-parada {
+  background: var(--panel);
+  color: var(--ink-1);
+  border: 1px solid var(--hair);
+  border-radius: 9px;
+  box-shadow: 0 3px 14px rgba(0,0,0,0.22);
+  font-family: inherit;
+  font-size: 12px;
+  padding: 5px 9px;
+}
+.leaflet-tooltip.tt-linea::before, .leaflet-tooltip.tt-parada::before { display: none; }
+.tt-chip {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px; height: 17px;
+  padding: 0 4px;
+  border-radius: 5px;
+  font-size: 10.5px;
+  font-weight: 800;
+  margin-right: 5px;
+  vertical-align: -3px;
+}
+.tt-sub { color: var(--ink-2); font-size: 11px; }
+
+.leaflet-popup-content-wrapper {
+  background: var(--panel);
+  color: var(--ink-1);
+  border-radius: 12px;
+  box-shadow: var(--sombra);
+  border: 1px solid var(--hair);
+}
+.leaflet-popup-tip { background: var(--panel); border: 1px solid var(--hair); }
+.leaflet-popup-content { font-family: inherit; margin: 12px 14px; line-height: 1.4; }
+.pop-titulo { font-size: 13.5px; font-weight: 750; margin: 0 0 2px; }
+.pop-sub { font-size: 12px; color: var(--ink-2); margin: 0 0 8px; }
+.pop-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+.pop-attr {
+  font-size: 10.5px;
+  font-weight: 650;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--hair);
+  color: var(--muted);
+}
+.pop-attr.si { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+.leaflet-container a.leaflet-popup-close-button { color: var(--muted); }
+
+/* ══════════ Tarjeta de cercanas ══════════ */
+#tarjeta-cercanas {
+  position: absolute;
+  left: 358px;
+  bottom: 26px;
+  width: 300px;
+  max-width: calc(100vw - 380px);
+  background: var(--panel);
+  border: 1px solid var(--hair);
+  border-radius: 14px;
+  box-shadow: var(--sombra);
+  z-index: 1100;
+  overflow: hidden;
+}
+.tarjeta-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 8px 6px 14px;
+}
+.tarjeta-head h3 { margin: 0; font-size: 13px; font-weight: 750; }
+.tarjeta-head .btn-icono { border: none; width: 28px; height: 28px; font-size: 13px; }
+#lista-cercanas { list-style: none; margin: 0; padding: 0 6px 8px; }
+#lista-cercanas li button {
+  width: 100%;
+  text-align: left;
+  padding: 7px 9px;
+  border-radius: 9px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+#lista-cercanas li button:hover { background: var(--hover-wash); }
+.cercana-nombre { font-size: 12px; font-weight: 550; }
+.cercana-dist { font-size: 11.5px; color: var(--geoloc); font-weight: 700; white-space: nowrap; }
+
+/* ══════════ Toast ══════════ */
+#toast {
+  position: absolute;
+  bottom: 26px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--activo-bg);
+  color: var(--activo-fg);
+  font-size: 12.5px;
+  font-weight: 550;
+  padding: 10px 18px;
+  border-radius: 999px;
+  box-shadow: var(--sombra);
+  z-index: 3000;
+  max-width: min(480px, 88vw);
+  text-align: center;
+}
+
+/* ══════════ Botón flotante (móvil) ══════════ */
+.btn-flotante {
+  display: none;
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 1300;
+  width: 42px; height: 42px;
+  place-items: center;
+  background: var(--panel);
+  color: var(--ink-1);
+  border: 1px solid var(--hair);
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+}
+
+@media (max-width: 860px) {
+  #panel {
+    position: absolute;
+    left: 0; top: 0;
+    height: 100%;
+    max-width: 86vw;
+    transform: translateX(-102%);
+    box-shadow: var(--sombra);
+  }
+  .panel-header { padding-left: 64px; }
+  #panel.abierto { transform: translateX(0); }
+  .btn-flotante { display: grid; }
+  #tarjeta-cercanas {
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-width: none;
+    bottom: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .linea-flujo, .dot-viajero-halo, .geo-halo { animation: none; }
+  #panel { transition: none; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ══════════ PANEL LATERAL ══════════ -->
+  <aside id="panel" aria-label="Panel de capas">
+    <header class="panel-header">
+      <div class="brand">
+        <span class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="26" height="26">
+            <rect x="3" y="2.5" width="18" height="15" rx="3" fill="currentColor"/>
+            <rect x="5.5" y="5.5" width="5.5" height="4.5" rx="1" fill="var(--panel)"/>
+            <rect x="13" y="5.5" width="5.5" height="4.5" rx="1" fill="var(--panel)"/>
+            <rect x="5.5" y="12.5" width="3" height="2" rx="1" fill="var(--panel)"/>
+            <circle cx="7.5" cy="19.5" r="2.1" fill="currentColor"/>
+            <circle cx="16.5" cy="19.5" r="2.1" fill="currentColor"/>
+          </svg>
+        </span>
+        <div class="brand-text">
+          <h1>Transporte Público</h1>
+          <p>Comodoro Rivadavia</p>
+        </div>
+      </div>
+      <button id="btn-tema" class="btn-icono" title="Cambiar tema claro/oscuro" aria-label="Cambiar tema">
+        <svg class="icono-luna" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="icono-sol" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4m11.4-11.4 1.4-1.4"/></svg>
+      </button>
+    </header>
+
+    <div class="stats-row" id="stats-row"><!-- se completa por JS --></div>
+
+    <div class="panel-scroll">
+      <section class="seccion" id="seccion-lineas">
+        <div class="seccion-head">
+          <h2>Líneas</h2>
+          <div class="mini-acciones">
+            <button id="btn-todas" class="btn-mini">Todas</button>
+            <button id="btn-ninguna" class="btn-mini">Ninguna</button>
+          </div>
+        </div>
+        <p class="ayuda">Tocá una línea para enfocarla y ver su sentido de circulación animado. El ojo la muestra u oculta.</p>
+        <ul id="lista-lineas"></ul>
+      </section>
+
+      <section class="seccion" id="seccion-paradas">
+        <div class="seccion-head">
+          <h2>Paradas</h2>
+          <label class="switch" title="Mostrar u ocultar paradas">
+            <input type="checkbox" id="chk-paradas" checked>
+            <span class="switch-track" aria-hidden="true"></span>
+          </label>
+        </div>
+        <p class="ayuda">Filtrá por infraestructura disponible en cada parada.</p>
+        <div id="filtros-paradas">
+          <div class="filtro-fila" data-campo="refugio">
+            <span class="filtro-nombre">Refugio</span>
+            <div class="segmentado" role="group" aria-label="Filtro refugio">
+              <button class="seg activo" data-val="todas">Todas</button>
+              <button class="seg" data-val="si">Sí</button>
+              <button class="seg" data-val="no">No</button>
+            </div>
+          </div>
+          <div class="filtro-fila" data-campo="cartel">
+            <span class="filtro-nombre">Cartel</span>
+            <div class="segmentado" role="group" aria-label="Filtro cartel">
+              <button class="seg activo" data-val="todas">Todas</button>
+              <button class="seg" data-val="si">Sí</button>
+              <button class="seg" data-val="no">No</button>
+            </div>
+          </div>
+          <div class="filtro-fila" data-campo="poste">
+            <span class="filtro-nombre">Poste</span>
+            <div class="segmentado" role="group" aria-label="Filtro poste">
+              <button class="seg activo" data-val="todas">Todas</button>
+              <button class="seg" data-val="si">Sí</button>
+              <button class="seg" data-val="no">No</button>
+            </div>
+          </div>
+          <div id="conteo-paradas" aria-live="polite"></div>
+        </div>
+      </section>
+    </div>
+
+    <footer class="panel-footer">
+      <p>Base cartográfica <a href="https://www.ign.gob.ar" target="_blank" rel="noopener">ARGENMAP · IGN Argentina</a></p>
+      <p>Recorridos y paradas de transporte público · Comodoro Rivadavia</p>
+    </footer>
+  </aside>
+
+  <!-- botón hamburguesa (solo móvil) -->
+  <button id="btn-panel" class="btn-flotante" title="Mostrar panel" aria-label="Mostrar u ocultar panel">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+  </button>
+
+  <!-- ══════════ MAPA ══════════ -->
+  <div id="mapa" role="application" aria-label="Mapa de líneas de colectivo"></div>
+
+  <!-- tarjeta de paradas cercanas -->
+  <div id="tarjeta-cercanas" hidden>
+    <div class="tarjeta-head">
+      <h3>Paradas más cercanas</h3>
+      <button id="btn-cerrar-cercanas" class="btn-icono" title="Cerrar" aria-label="Cerrar">✕</button>
+    </div>
+    <ol id="lista-cercanas"></ol>
+  </div>
+
+  <!-- avisos -->
+  <div id="toast" role="status" aria-live="polite" hidden></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<!-- Datos remotos (GitHub Pages) -->
+<script src="https://agstnrdz.github.io/ide/layers_transporte_lineas/lineas_data.js"></script>
+<script src="https://agstnrdz.github.io/ide/layers_transporte_lineas/paradas_data.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   Visor de transporte público — Comodoro Rivadavia
+   Datos: window.LINEAS_DATA (lineas_data.js) y
+          window.PARADAS_DATA (paradas_data.js) desde GitHub Pages
+   ═══════════════════════════════════════════════════════════════ */
+"use strict";
+
+/* ── Datos: verificación de carga ─────────────────────────────── */
+if (!window.LINEAS_DATA || !window.PARADAS_DATA) {
+  document.getElementById("mapa").innerHTML =
+    '<p style="padding:24px;font-family:system-ui">No se pudieron cargar los datos remotos ' +
+    '(lineas_data.js / paradas_data.js). Verificá la conexión o las URLs del repositorio.</p>';
+  throw new Error("Datos remotos no disponibles");
+}
+const LINEAS_DATA = window.LINEAS_DATA;
+const PARADAS_DATA = window.PARADAS_DATA;
+
+/* ── Tema ─────────────────────────────────────────────────────── */
+const TEMA_KEY = "transporte-tema";
+function temaActual() {
+  return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+}
+function aplicarTema(tema) {
+  if (tema === "dark") document.documentElement.setAttribute("data-theme", "dark");
+  else document.documentElement.removeAttribute("data-theme");
+  try { localStorage.setItem(TEMA_KEY, tema); } catch (e) { /* file:// o iframe puede bloquear */ }
+}
+(function initTema() {
+  let guardado = null;
+  try { guardado = localStorage.getItem(TEMA_KEY); } catch (e) { /* noop */ }
+  const preferido = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  aplicarTema(guardado || preferido);
+})();
+
+/* ── Utilidades ───────────────────────────────────────────────── */
+function colorChipTexto(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  const L = 0.2126 * lin(n >> 16) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+  return L > 0.36 ? "#0b0b0b" : "#ffffff";
+}
+function colorLinea(linea) { return temaActual() === "dark" ? linea.colorDark : linea.color; }
+function fmtDist(m) { return m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1)} km`; }
+function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+let toastTimer = null;
+function toast(msg, ms = 4000) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.hidden = true; }, ms);
+}
+
+/* ── Mapa base ────────────────────────────────────────────────── */
+const mapa = L.map("mapa", { zoomControl: false, attributionControl: true });
+mapa.attributionControl.setPrefix(false);
+L.control.zoom({ position: "bottomright" }).addTo(mapa);
+L.control.scale({ imperial: false, position: "bottomleft" }).addTo(mapa);
+
+const ATTR_IGN = '&copy; <a href="https://www.ign.gob.ar" target="_blank" rel="noopener">IGN Argentina (ARGENMAP)</a> &middot; &copy; colaboradores de <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
+const TILE_OPTS = { maxZoom: 19, maxNativeZoom: 18, attribution: ATTR_IGN };
+
+const capaArgenmapClaro = L.tileLayer(
+  "https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capabaseargenmap@EPSG:3857@png/{z}/{x}/{-y}.png", TILE_OPTS);
+const capaArgenmapOscuro = L.tileLayer(
+  "https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/argenmap_oscuro@EPSG:3857@png/{z}/{x}/{-y}.png", TILE_OPTS);
+const capaSatelite = L.tileLayer(
+  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  { maxZoom: 19, maxNativeZoom: 17, attribution: "&copy; Esri, Maxar, Earthstar Geographics" });
+
+let baseActiva = "mapa"; // 'mapa' | 'satelite'
+function capaBase() {
+  if (baseActiva === "satelite") return capaSatelite;
+  return temaActual() === "dark" ? capaArgenmapOscuro : capaArgenmapClaro;
+}
+let capaBaseActual = capaBase().addTo(mapa);
+function actualizarBase() {
+  const nueva = capaBase();
+  if (nueva !== capaBaseActual) {
+    mapa.removeLayer(capaBaseActual);
+    capaBaseActual = nueva.addTo(mapa);
+  }
+}
+
+/* panes: casing < lineas < paradas < foco */
+mapa.createPane("casing").style.zIndex = 391;
+mapa.createPane("lineas").style.zIndex = 393;
+mapa.createPane("paradas").style.zIndex = 395;
+mapa.createPane("foco").style.zIndex = 397;
+const rendererParadas = L.canvas({ pane: "paradas", padding: 0.4 });
+
+/* ── Estado ───────────────────────────────────────────────────── */
+const estado = {
+  visibles: new Set(LINEAS_DATA.map((l) => l.id)),
+  enfocada: null,
+  rutasApagadas: new Set(),
+  paradasOn: true,
+  filtros: { refugio: "todas", cartel: "todas", poste: "todas" },
+};
+
+/* ── Capas de líneas ──────────────────────────────────────────── */
+const CASING = { light: "#ffffff", dark: "#0a0a0a" };
+const rutasPorLinea = new Map();
+const lineaPorId = new Map(LINEAS_DATA.map((l) => [l.id, l]));
+
+function tooltipLinea(linea, ruta) {
+  const fg = colorChipTexto(colorLinea(linea));
+  const cartel = ruta.cartel || linea.nombre;
+  return `<span class="tt-chip" style="background:${colorLinea(linea)};color:${fg}">${esc(linea.id)}</span>` +
+         `<strong>${esc(cartel)}</strong><br><span class="tt-sub">${esc(ruta.sentido)} · tocá para enfocar</span>`;
+}
+
+for (const linea of LINEAS_DATA) {
+  const items = [];
+  for (const ruta of linea.rutas) {
+    const latlngs = ruta.paths.length === 1 ? ruta.paths[0] : ruta.paths;
+    const casing = L.polyline(latlngs, {
+      pane: "casing", color: CASING[temaActual()], weight: 8, opacity: 0.85,
+      lineCap: "round", lineJoin: "round", interactive: false,
+    }).addTo(mapa);
+    const poly = L.polyline(latlngs, {
+      pane: "lineas", color: colorLinea(linea), weight: 3.4, opacity: 1,
+      lineCap: "round", lineJoin: "round",
+    }).addTo(mapa);
+    poly.bindTooltip(() => tooltipLinea(linea, ruta), { sticky: true, className: "tt-linea", opacity: 1 });
+    poly.on("mouseover", () => {
+      if (!estado.enfocada || estado.enfocada === linea.id) poly.setStyle({ weight: 6 });
+    });
+    poly.on("mouseout", () => reestilarLinea(linea.id));
+    poly.on("click", (e) => { L.DomEvent.stop(e); alternarFoco(linea.id); });
+    items.push({ ruta, casing, poly, latlngs: ruta.paths.length === 1 ? ruta.paths[0] : ruta.paths.flat() });
+    // nota: para rutas con varios paths, latlngs se usa solo para bounds/animacion
+  }
+  rutasPorLinea.set(linea.id, items);
+}
+
+function reestilarLinea(id) {
+  const linea = lineaPorId.get(id);
+  const items = rutasPorLinea.get(id);
+  const hayFoco = estado.enfocada !== null;
+  const esFoco = estado.enfocada === id;
+  for (const it of items) {
+    const rutaOn = estado.visibles.has(id) && !(esFoco && estado.rutasApagadas.has(it.ruta.id));
+    if (!rutaOn) {
+      mapa.removeLayer(it.poly);
+      mapa.removeLayer(it.casing);
+      continue;
+    }
+    if (!mapa.hasLayer(it.poly)) { it.casing.addTo(mapa); it.poly.addTo(mapa); }
+    it.casing.setStyle({ color: CASING[temaActual()] });
+    if (!hayFoco) {
+      it.poly.setStyle({ color: colorLinea(linea), weight: 3.4, opacity: 1 });
+      it.casing.setStyle({ opacity: 0.85, weight: 8 });
+    } else if (esFoco) {
+      it.poly.setStyle({ color: colorLinea(linea), weight: 5, opacity: 1 });
+      it.casing.setStyle({ opacity: 0.95, weight: 10 });
+      it.poly.bringToFront();
+    } else {
+      it.poly.setStyle({ color: colorLinea(linea), weight: 2.4, opacity: 0.14 });
+      it.casing.setStyle({ opacity: 0, weight: 6 });
+    }
+  }
+}
+function reestilarTodo() {
+  for (const l of LINEAS_DATA) reestilarLinea(l.id);
+}
+
+/* ── Animación de sentido (foco) ──────────────────────────────── */
+const anim = { overlays: [], dots: [], raf: null, t0: 0 };
+
+function limpiarAnimacion() {
+  if (anim.raf) cancelAnimationFrame(anim.raf);
+  anim.raf = null;
+  for (const o of anim.overlays) mapa.removeLayer(o);
+  for (const d of anim.dots) { mapa.removeLayer(d.dot); mapa.removeLayer(d.halo); }
+  anim.overlays = [];
+  anim.dots = [];
+}
+
+function armarAnimacion(id) {
+  limpiarAnimacion();
+  const linea = lineaPorId.get(id);
+  const items = rutasPorLinea.get(id).filter((it) => mapa.hasLayer(it.poly));
+  for (const it of items) {
+    const overlay = L.polyline(it.poly.getLatLngs(), {
+      pane: "foco", color: "#ffffff", weight: 2.4, opacity: 0.95,
+      dashArray: "3 15", className: "linea-flujo", interactive: false,
+      lineCap: "round",
+    }).addTo(mapa);
+    anim.overlays.push(overlay);
+
+    /* un punto viajero por cada path (evita saltos en rutas partidas) */
+    for (const path of it.ruta.paths) {
+      const pts = path.map(([la, ln]) => L.latLng(la, ln));
+      const acum = [0];
+      for (let i = 1; i < pts.length; i++) acum.push(acum[i - 1] + pts[i - 1].distanceTo(pts[i]));
+      const total = acum[acum.length - 1];
+      if (total < 50) continue;
+      const halo = L.circleMarker(pts[0], {
+        pane: "foco", radius: 11, color: colorLinea(linea), weight: 2.5,
+        fill: false, className: "dot-viajero-halo", interactive: false,
+      }).addTo(mapa);
+      const dot = L.circleMarker(pts[0], {
+        pane: "foco", radius: 5.5, color: "#ffffff", weight: 2,
+        fillColor: colorLinea(linea), fillOpacity: 1, interactive: false,
+      }).addTo(mapa);
+      const dur = Math.min(38000, Math.max(14000, total / 0.45));
+      anim.dots.push({ pts, acum, total, dur, dot, halo, idx: 1, offset: Math.random() * 0.35 });
+    }
+  }
+  if (anim.dots.length) {
+    anim.t0 = performance.now();
+    anim.raf = requestAnimationFrame(pasoAnimacion);
+  }
+}
+
+function pasoAnimacion(now) {
+  for (const d of anim.dots) {
+    const p = ((now - anim.t0) / d.dur + d.offset) % 1;
+    const objetivo = p * d.total;
+    if (d.acum[d.idx - 1] > objetivo) d.idx = 1;
+    while (d.idx < d.acum.length - 1 && d.acum[d.idx] < objetivo) d.idx++;
+    const a = d.acum[d.idx - 1], b = d.acum[d.idx];
+    const f = b > a ? (objetivo - a) / (b - a) : 0;
+    const p1 = d.pts[d.idx - 1], p2 = d.pts[d.idx];
+    const pos = L.latLng(p1.lat + (p2.lat - p1.lat) * f, p1.lng + (p2.lng - p1.lng) * f);
+    d.dot.setLatLng(pos);
+    d.halo.setLatLng(pos);
+  }
+  anim.raf = requestAnimationFrame(pasoAnimacion);
+}
+
+/* ── Foco de línea ────────────────────────────────────────────── */
+function alternarFoco(id) {
+  if (estado.enfocada === id) desenfocar();
+  else enfocar(id);
+}
+
+function enfocar(id) {
+  estado.enfocada = id;
+  estado.rutasApagadas.clear();
+  if (!estado.visibles.has(id)) estado.visibles.add(id);
+  reestilarTodo();
+  armarAnimacion(id);
+  actualizarPanelFoco();
+  const bounds = boundsDeLinea(id);
+  if (bounds) mapa.flyToBounds(bounds, { padding: [46, 46], duration: 0.7 });
+  if (window.matchMedia("(max-width: 860px)").matches) cerrarPanelMovil();
+}
+
+function desenfocar() {
+  estado.enfocada = null;
+  estado.rutasApagadas.clear();
+  limpiarAnimacion();
+  reestilarTodo();
+  actualizarPanelFoco();
+}
+
+function boundsDeLinea(id) {
+  let b = null;
+  for (const it of rutasPorLinea.get(id)) {
+    if (!mapa.hasLayer(it.poly)) continue;
+    b = b ? b.extend(it.poly.getBounds()) : L.latLngBounds(it.poly.getBounds().getSouthWest(), it.poly.getBounds().getNorthEast());
+  }
+  return b;
+}
+
+/* ── Panel: lista de líneas ───────────────────────────────────── */
+const listaLineas = document.getElementById("lista-lineas");
+const filasPorId = new Map();
+
+const ICONO_OJO = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>';
+const FLECHAS = { ida: "→", vuelta: "←", circular: "↻", unico: "→" };
+
+for (const linea of LINEAS_DATA) {
+  const li = document.createElement("li");
+  li.className = "linea-row";
+  li.dataset.id = linea.id;
+  const fg = colorChipTexto(linea.color);
+  const pills = linea.rutas.map((r) =>
+    `<button class="pill sentido activo" data-ruta="${esc(r.id)}" title="${esc(r.cartel || linea.nombre)}">` +
+    `${FLECHAS[r.tipo] || "→"} ${esc(r.sentido)}</button>`
+  ).join("");
+  const carteles = linea.rutas.some((r) => r.cartel)
+    ? `<p class="detalle-cartel">${linea.rutas.filter((r) => r.cartel).map((r) => esc(`${r.sentido}: ${r.cartel}`)).join(" · ")}</p>`
+    : "";
+  li.innerHTML =
+    `<div class="linea-main">` +
+      `<span class="chip" style="--c:${linea.color};--chip-fg:${fg}">${esc(linea.id)}</span>` +
+      `<span class="linea-nombre">${esc(linea.nombre)}</span>` +
+      `<button class="btn-ojo" title="Mostrar u ocultar línea ${esc(linea.id)}" aria-label="Mostrar u ocultar línea ${esc(linea.id)}">${ICONO_OJO}</button>` +
+    `</div>` +
+    `<div class="linea-detalle">${pills}${carteles}</div>`;
+  listaLineas.appendChild(li);
+  filasPorId.set(linea.id, li);
+
+  li.querySelector(".linea-main").addEventListener("click", (e) => {
+    if (e.target.closest(".btn-ojo")) return;
+    alternarFoco(linea.id);
+  });
+  li.querySelector(".btn-ojo").addEventListener("click", () => {
+    const visible = estado.visibles.has(linea.id);
+    if (visible) {
+      estado.visibles.delete(linea.id);
+      if (estado.enfocada === linea.id) desenfocar();
+    } else {
+      estado.visibles.add(linea.id);
+    }
+    reestilarLinea(linea.id);
+    actualizarPanelFoco();
+  });
+  li.querySelectorAll(".pill.sentido").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const rid = btn.dataset.ruta;
+      if (estado.rutasApagadas.has(rid)) estado.rutasApagadas.delete(rid);
+      else {
+        const encendidas = linea.rutas.filter((r) => !estado.rutasApagadas.has(r.id));
+        if (encendidas.length <= 1) return;
+        estado.rutasApagadas.add(rid);
+      }
+      btn.classList.toggle("activo", !estado.rutasApagadas.has(rid));
+      reestilarLinea(linea.id);
+      if (estado.enfocada === linea.id) armarAnimacion(linea.id);
+    });
+  });
+}
+
+function actualizarPanelFoco() {
+  for (const [id, li] of filasPorId) {
+    li.classList.toggle("enfocada", estado.enfocada === id);
+    li.classList.toggle("oculta", !estado.visibles.has(id));
+    if (estado.enfocada !== id) {
+      li.querySelectorAll(".pill.sentido").forEach((b) => b.classList.add("activo"));
+    }
+  }
+}
+
+document.getElementById("btn-todas").addEventListener("click", () => {
+  LINEAS_DATA.forEach((l) => estado.visibles.add(l.id));
+  reestilarTodo();
+  actualizarPanelFoco();
+});
+document.getElementById("btn-ninguna").addEventListener("click", () => {
+  estado.visibles.clear();
+  if (estado.enfocada) desenfocar();
+  reestilarTodo();
+  actualizarPanelFoco();
+});
+
+/* ── Paradas ──────────────────────────────────────────────────── */
+const grupoParadas = L.layerGroup().addTo(mapa);
+const marcadoresParadas = new Map();
+const COLOR_PARADA = { light: "#3a3935", dark: "#e9e7df" };
+
+function radioParadas() {
+  const z = mapa.getZoom();
+  return z >= 16 ? 5.5 : z >= 14.5 ? 4 : z >= 13 ? 3 : 2.2;
+}
+
+function popupParada(p) {
+  const attr = (nombre, val) =>
+    `<span class="pop-attr ${val ? "si" : ""}">${val ? "✓" : "✗"} ${nombre}</span>`;
+  const esquina = p.esquina ? ` <span style="color:var(--muted)">esq.</span> ${esc(p.esquina)}` : "";
+  return `<p class="pop-titulo">Parada ${esc(p.id)}</p>` +
+         `<p class="pop-sub">${esc(p.calle || "Calle sin nombre")}${esquina}</p>` +
+         `<div class="pop-chips">${attr("Refugio", p.refugio)}${attr("Cartel", p.cartel)}${attr("Poste", p.poste)}</div>`;
+}
+
+for (const p of PARADAS_DATA) {
+  const m = L.circleMarker([p.lat, p.lng], {
+    renderer: rendererParadas, pane: "paradas",
+    radius: 3, weight: 1.1,
+    color: CASING[temaActual() === "dark" ? "dark" : "light"],
+    fillColor: COLOR_PARADA[temaActual()], fillOpacity: 0.92, opacity: 0.9,
+  });
+  m.bindPopup(() => popupParada(p), { closeButton: true });
+  m.bindTooltip(
+    () => `<strong>Parada ${esc(p.id)}</strong><br><span class="tt-sub">${esc(p.calle || "s/n")}${p.esquina ? " esq. " + esc(p.esquina) : ""}</span>`,
+    { className: "tt-parada", direction: "top", offset: [0, -4], opacity: 1 });
+  marcadoresParadas.set(p.id, m);
+}
+
+function pasaFiltros(p) {
+  for (const campo of ["refugio", "cartel", "poste"]) {
+    const f = estado.filtros[campo];
+    if (f === "si" && !p[campo]) return false;
+    if (f === "no" && p[campo]) return false;
+  }
+  return true;
+}
+
+function aplicarFiltrosParadas() {
+  grupoParadas.clearLayers();
+  let n = 0;
+  if (estado.paradasOn) {
+    const r = radioParadas();
+    for (const p of PARADAS_DATA) {
+      if (!pasaFiltros(p)) continue;
+      const m = marcadoresParadas.get(p.id);
+      m.setRadius(r);
+      grupoParadas.addLayer(m);
+      n++;
+    }
+  }
+  const cont = document.getElementById("conteo-paradas");
+  cont.innerHTML = estado.paradasOn
+    ? `Mostrando <strong>${n}</strong> de ${PARADAS_DATA.length} paradas`
+    : "Capa de paradas apagada";
+  document.getElementById("seccion-paradas").classList.toggle("apagada", !estado.paradasOn);
+}
+
+function reestilarParadas() {
+  const fill = COLOR_PARADA[temaActual()];
+  const ring = CASING[temaActual() === "dark" ? "dark" : "light"];
+  for (const m of marcadoresParadas.values()) m.setStyle({ fillColor: fill, color: ring });
+}
+
+mapa.on("zoomend", () => {
+  const r = radioParadas();
+  grupoParadas.eachLayer((m) => m.setRadius(r));
+});
+
+document.getElementById("chk-paradas").addEventListener("change", (e) => {
+  estado.paradasOn = e.target.checked;
+  aplicarFiltrosParadas();
+});
+
+document.querySelectorAll(".filtro-fila").forEach((fila) => {
+  const campo = fila.dataset.campo;
+  fila.querySelectorAll(".seg").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      estado.filtros[campo] = btn.dataset.val;
+      fila.querySelectorAll(".seg").forEach((b) => b.classList.toggle("activo", b === btn));
+      aplicarFiltrosParadas();
+    });
+  });
+});
+
+/* ── Geolocalización ──────────────────────────────────────────── */
+function geoColor() { return temaActual() === "dark" ? "#3987e5" : "#2a78d6"; }
+let geoMarcadores = [];
+function limpiarGeo() {
+  geoMarcadores.forEach((m) => mapa.removeLayer(m));
+  geoMarcadores = [];
+  document.getElementById("tarjeta-cercanas").hidden = true;
+}
+
+function ubicarme() {
+  if (!("geolocation" in navigator)) {
+    toast("Este navegador no soporta geolocalización.");
+    return;
+  }
+  toast("Buscando tu ubicación…", 8000);
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      limpiarGeo();
+      document.getElementById("toast").hidden = true;
+      const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+      const aqui = L.latLng(lat, lng);
+      const precision = L.circle(aqui, {
+        radius: Math.min(accuracy, 400), color: geoColor(),
+        weight: 1, opacity: 0.5, fillColor: geoColor(), fillOpacity: 0.12, interactive: false,
+      }).addTo(mapa);
+      const halo = L.circleMarker(aqui, {
+        radius: 13, color: geoColor(), weight: 2.5, fill: false,
+        className: "geo-halo", interactive: false,
+      }).addTo(mapa);
+      const punto = L.circleMarker(aqui, {
+        radius: 6.5, color: "#ffffff", weight: 2.5,
+        fillColor: geoColor(), fillOpacity: 1,
+      }).bindTooltip("Estás acá", { direction: "top", className: "tt-parada", offset: [0, -6] }).addTo(mapa);
+      geoMarcadores.push(precision, halo, punto);
+
+      const cercanas = PARADAS_DATA
+        .map((p) => ({ p, d: aqui.distanceTo([p.lat, p.lng]) }))
+        .sort((a, b) => a.d - b.d)
+        .slice(0, 5);
+      const ol = document.getElementById("lista-cercanas");
+      ol.innerHTML = "";
+      for (const { p, d } of cercanas) {
+        const anillo = L.circleMarker([p.lat, p.lng], {
+          radius: 9, color: geoColor(), weight: 2.5, fill: false, interactive: false,
+        }).addTo(mapa);
+        geoMarcadores.push(anillo);
+        const li = document.createElement("li");
+        const btn = document.createElement("button");
+        btn.innerHTML =
+          `<span class="cercana-nombre">Parada ${esc(p.id)} · ${esc(p.calle || "s/n")}${p.esquina ? " esq. " + esc(p.esquina) : ""}</span>` +
+          `<span class="cercana-dist">${fmtDist(d)}</span>`;
+        btn.addEventListener("click", () => {
+          mapa.flyTo([p.lat, p.lng], Math.max(mapa.getZoom(), 16), { duration: 0.6 });
+          const m = marcadoresParadas.get(p.id);
+          if (m && grupoParadas.hasLayer(m)) m.openPopup();
+          else L.popup({ closeButton: true }).setLatLng([p.lat, p.lng]).setContent(popupParada(p)).openOn(mapa);
+        });
+        li.appendChild(btn);
+        ol.appendChild(li);
+      }
+      document.getElementById("tarjeta-cercanas").hidden = false;
+      mapa.flyTo(aqui, Math.max(mapa.getZoom(), 15), { duration: 0.8 });
+    },
+    (err) => {
+      if (err.code === err.PERMISSION_DENIED) {
+        toast(location.protocol === "file:"
+          ? "El navegador bloquea la geolocalización al abrir el archivo directamente. Probá servirlo por http(s)."
+          : "Permiso de ubicación denegado.");
+      } else {
+        toast("No se pudo obtener tu ubicación.");
+      }
+    },
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
+  );
+}
+document.getElementById("btn-cerrar-cercanas").addEventListener("click", limpiarGeo);
+
+/* ── Controles del mapa (base + acciones) ─────────────────────── */
+const CtrlMapa = L.Control.extend({
+  options: { position: "topright" },
+  onAdd() {
+    const div = L.DomUtil.create("div", "ctrl-mapa");
+    div.innerHTML =
+      `<div class="ctrl-grupo" role="group" aria-label="Mapa base">` +
+        `<button id="btn-base-mapa" class="activo" title="Mapa ARGENMAP">Mapa</button>` +
+        `<button id="btn-base-sat" title="Imagen satelital">Satélite</button>` +
+      `</div>` +
+      `<div class="ctrl-grupo vertical">` +
+        `<button id="btn-ubicarme" title="Mi ubicación y paradas cercanas" aria-label="Mi ubicación">` +
+          `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="8"/><path d="M12 1.5V4m0 16v2.5M1.5 12H4m16 0h2.5"/></svg>` +
+        `</button>` +
+        `<button id="btn-encuadre" title="Ver toda la red" aria-label="Ver toda la red">` +
+          `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>` +
+        `</button>` +
+      `</div>`;
+    L.DomEvent.disableClickPropagation(div);
+    L.DomEvent.disableScrollPropagation(div);
+    return div;
+  },
+});
+mapa.addControl(new CtrlMapa());
+
+document.getElementById("btn-base-mapa").addEventListener("click", () => {
+  baseActiva = "mapa";
+  document.getElementById("btn-base-mapa").classList.add("activo");
+  document.getElementById("btn-base-sat").classList.remove("activo");
+  actualizarBase();
+});
+document.getElementById("btn-base-sat").addEventListener("click", () => {
+  baseActiva = "satelite";
+  document.getElementById("btn-base-sat").classList.add("activo");
+  document.getElementById("btn-base-mapa").classList.remove("activo");
+  actualizarBase();
+});
+document.getElementById("btn-ubicarme").addEventListener("click", ubicarme);
+
+let boundsRed = null;
+for (const items of rutasPorLinea.values()) {
+  for (const it of items) {
+    const b = it.poly.getBounds();
+    boundsRed = boundsRed ? boundsRed.extend(b) : L.latLngBounds(b.getSouthWest(), b.getNorthEast());
+  }
+}
+document.getElementById("btn-encuadre").addEventListener("click", () => {
+  if (estado.enfocada) desenfocar();
+  mapa.flyToBounds(boundsRed, { padding: [30, 30], duration: 0.8 });
+});
+
+/* click en el mapa vacío: quitar foco */
+mapa.on("click", () => { if (estado.enfocada) desenfocar(); });
+
+/* ── Tema: botón ──────────────────────────────────────────────── */
+function reestilarChips() {
+  for (const [id, li] of filasPorId) {
+    const c = colorLinea(lineaPorId.get(id));
+    const chip = li.querySelector(".chip");
+    chip.style.setProperty("--c", c);
+    chip.style.setProperty("--chip-fg", colorChipTexto(c));
+  }
+}
+document.getElementById("btn-tema").addEventListener("click", () => {
+  aplicarTema(temaActual() === "dark" ? "light" : "dark");
+  actualizarBase();
+  reestilarTodo();
+  reestilarParadas();
+  reestilarChips();
+  if (estado.enfocada) armarAnimacion(estado.enfocada);
+});
+reestilarChips();
+
+/* ── Panel móvil ──────────────────────────────────────────────── */
+const panel = document.getElementById("panel");
+document.getElementById("btn-panel").addEventListener("click", () => {
+  panel.classList.toggle("abierto");
+});
+function cerrarPanelMovil() { panel.classList.remove("abierto"); }
+mapa.on("dragstart", cerrarPanelMovil);
+
+/* ── Stats + arranque ─────────────────────────────────────────── */
+(function initStats() {
+  const nRutas = LINEAS_DATA.reduce((acc, l) => acc + l.rutas.length, 0);
+  document.getElementById("stats-row").innerHTML =
+    `<span><strong>${LINEAS_DATA.length}</strong> líneas</span>` +
+    `<span><strong>${nRutas}</strong> recorridos</span>` +
+    `<span><strong>${PARADAS_DATA.length}</strong> paradas</span>`;
+})();
+
+mapa.fitBounds(boundsRed, { padding: [24, 24] });
+aplicarFiltrosParadas();
+actualizarPanelFoco();
+</script>
+</body>
+</html>
