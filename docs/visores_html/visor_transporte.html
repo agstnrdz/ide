@@ -34,6 +34,8 @@
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
   background: var(--panel);
+  display: flex;
+  flex-direction: column;
 }
 #visor-transporte[data-theme="dark"] {
   --panel:        #1a1a19;
@@ -54,6 +56,10 @@
 #visor-transporte button:focus-visible { outline: 2px solid var(--geoloc); outline-offset: 2px; }
 #visor-transporte a { color: inherit; }
 
+/* pantalla completa: el cuerpo crece y ocupa todo */
+#visor-transporte:fullscreen { border-radius: 0; border: none; max-width: none; }
+#visor-transporte:fullscreen .vt-cuerpo { height: auto; flex: 1; }
+
 /* ══ Cabecera institucional ══ */
 .vt-header {
   display: flex;
@@ -62,11 +68,12 @@
   padding: 14px 18px;
   background: var(--marca);
   color: #fff;
+  flex-shrink: 0;
 }
 .vt-header-texto h1 { margin: 0; font-size: 17px; font-weight: 700; line-height: 1.2; }
 .vt-header-texto p  { margin: 2px 0 0; font-size: 12.5px; opacity: 0.9; }
 .vt-header .logo { height: 44px; width: auto; flex-shrink: 0; margin-left: auto; }
-.vt-btn-tema {
+.vt-btn-header {
   width: 34px; height: 34px;
   display: grid; place-items: center;
   border-radius: 9px;
@@ -75,7 +82,7 @@
   flex-shrink: 0;
   transition: background 0.15s;
 }
-.vt-btn-tema:hover { background: rgba(255,255,255,0.12); }
+.vt-btn-header:hover { background: rgba(255,255,255,0.12); }
 #visor-transporte[data-theme="dark"] .icono-luna { display: none; }
 #visor-transporte:not([data-theme="dark"]) .icono-sol { display: none; }
 
@@ -83,7 +90,7 @@
 .vt-cuerpo { position: relative; height: 520px; background: var(--mapa-fondo); }
 #mapa { position: absolute; inset: 0; background: var(--mapa-fondo); z-index: 1; }
 
-/* ══ Caja de capas flotante (estilo control de capas, moderna) ══ */
+/* ══ Caja de capas flotante (solapa de líneas y paradas) ══ */
 #caja-capas {
   position: absolute;
   top: 12px;
@@ -164,7 +171,7 @@
 }
 .btn-mini:hover { background: var(--hover-wash); color: var(--ink-1); }
 
-/* ── Mapa base (segmentado dentro de la caja) ── */
+/* ── Mapa base (segmentado: Argenmap / Satelital Google) ── */
 .segmentado {
   display: flex;
   border: 1px solid var(--hair);
@@ -456,16 +463,22 @@
   text-align: center;
 }
 
-/* ══ Pie de créditos ══ */
+/* ══ Pie de créditos: una sola línea, letra pequeña ══ */
 .vt-footer {
-  padding: 9px 18px 10px;
+  padding: 8px 18px 9px;
   border-top: 1px solid var(--hair);
-  font-size: 10.5px;
-  line-height: 1.55;
+  font-size: 10px;
+  line-height: 1.4;
   color: var(--muted);
   background: var(--panel);
+  flex-shrink: 0;
 }
-.vt-footer p { margin: 0; }
+.vt-footer p {
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 @media (max-width: 640px) {
   .vt-header .logo { height: 34px; }
@@ -479,17 +492,20 @@
 
 <div class="visor-geo" id="visor-transporte">
 
-  <!-- Cabecera del visor: título + descripción + logo -->
+  <!-- Cabecera del visor: título + descripción + logo + tema + pantalla completa -->
   <div class="vt-header">
     <div class="vt-header-texto">
       <h1>Transporte público — Líneas y paradas</h1>
-      <p>Comodoro Rivadavia. Tocá una línea para enfocarla y ver su sentido de circulación animado.</p>
+      <p>Comodoro Rivadavia. Elegí qué líneas encender y tocá una para enfocarla y ver su sentido de circulación.</p>
     </div>
     <img src="https://agstnrdz.github.io/ide/assets/img/logotipo_MCR_DGMIT_blanco.png"
          alt="Logo" class="logo" onerror="this.style.display='none'">
-    <button id="btn-tema" class="vt-btn-tema" title="Cambiar tema claro/oscuro" aria-label="Cambiar tema">
+    <button id="btn-tema" class="vt-btn-header" title="Cambiar tema claro/oscuro" aria-label="Cambiar tema">
       <svg class="icono-luna" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
       <svg class="icono-sol" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4m11.4-11.4 1.4-1.4"/></svg>
+    </button>
+    <button id="btn-fs" class="vt-btn-header" title="Pantalla completa" aria-label="Pantalla completa">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
     </button>
   </div>
 
@@ -497,7 +513,7 @@
   <div class="vt-cuerpo">
     <div id="mapa" role="application" aria-label="Mapa de líneas de colectivo"></div>
 
-    <!-- Caja de capas (estilo control de capas de los visores censales) -->
+    <!-- Solapa de capas: mapa base + líneas + paradas -->
     <div id="caja-capas">
       <div class="caja-head" id="caja-head" role="button" aria-expanded="true" tabindex="0">
         <h2>Capas</h2>
@@ -509,8 +525,8 @@
       <div class="caja-body">
 
         <div class="segmentado base" role="group" aria-label="Mapa base">
-          <button class="seg activo" id="btn-base-mapa" title="Mapa ARGENMAP">Mapa</button>
-          <button class="seg" id="btn-base-sat" title="Imagen satelital">Satélite</button>
+          <button class="seg activo" id="btn-base-mapa" title="Mapa base Argenmap (IGN)">Argenmap</button>
+          <button class="seg" id="btn-base-sat" title="Imagen satelital de Google">Satelital</button>
         </div>
 
         <section id="seccion-lineas">
@@ -576,32 +592,163 @@
     <div id="toast" role="status" aria-live="polite" hidden></div>
   </div>
 
-  <!-- Pie de créditos -->
+  <!-- Pie de créditos (una sola línea) -->
   <footer class="vt-footer">
-    <p>Base cartográfica: <a href="https://www.ign.gob.ar" target="_blank" rel="noopener">ARGENMAP · Instituto Geográfico Nacional</a> + OpenStreetMap · Imágenes satelitales © Google</p>
-    <p>Fuente: Dirección General de Transporte (recorridos) · Relevamiento de paradas 2023. Procesamiento: Modernización e Investigación Territorial</p>
+    <p>Instituto Geográfico Nacional + OpenStreetMap. Google Satelital. Fuente: Dirección General de Transporte (recorridos). Relevamiento de paradas 2023. Procesamiento: Modernización e Investigación Territorial</p>
   </footer>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://agstnrdz.github.io/ide/layers_transporte_lineas/lineas_data.js"></script>
-<script src="https://agstnrdz.github.io/ide/layers_transporte_lineas/paradas_data.js"></script>
+<!-- Datos: los 23 archivos de líneas + paradas, directo del repositorio (sin consolidar) -->
+<script src="https://agstnrdz.github.io/ide/layers_transporte/linea_1_data.js"></script>
+<script src="https://agstnrdz.github.io/ide/layers_transporte/linea_2_data.js"></script>
+<script src="https://agstnrdz.github.io/ide/layers_transporte/linea_3_data.js"></script>
+<script src="https://agstnrdz.github.io/ide/layers_transporte/linea_4_data.js"></script>
+<script src="https://agstnrdz.github.io/ide/layers_transporte/linea_5_data.js"></script>
+<script src="https://agstnrdz.github.io/ide/layers_transporte/linea_5U_data.js"></script>
+<script src="https://agstnrdz.github.io/ide/layers_transporte/linea_6H_data.js"></script>
+<script src="https://agstnrdz.github.io/ide/layers_transporte/linea_6AH_data.js"></script>
+<script src="https://agstnrdz.github.io/ide/layers_transporte/linea_7_data.js"></script>
+<script src="https://agstnrdz.github.io/ide/layers_transporte/linea_8H_data.js"></script>
+<script src="https://agstnrdz.github.io/ide/layers_transporte/linea_8AH_data.js"></script>
+<script src="https://agstnrdz.github.io/ide/layers_transporte/linea_9_data.js"></script>
+<script src="https://agstnrdz.github.io/ide/layers_transporte/linea_12_data.js"></script>
+<script src="https://agstnrdz.github.io/ide/layers_transporte/linea_13_data.js"></script>
+<script src="https://agstnrdz.github.io/ide/layers_transporte/linea_14_data.js"></script>
+<script src="https://agstnrdz.github.io/ide/layers_transporte/linea_15_data.js"></script>
+<script src="https://agstnrdz.github.io/ide/layers_transporte/linea_16_data.js"></script>
+<script src="https://agstnrdz.github.io/ide/layers_transporte/linea_17_data.js"></script>
+<script src="https://agstnrdz.github.io/ide/layers_transporte/linea_18_data.js"></script>
+<script src="https://agstnrdz.github.io/ide/layers_transporte/linea_19_data.js"></script>
+<script src="https://agstnrdz.github.io/ide/layers_transporte/linea_20_data.js"></script>
+<script src="https://agstnrdz.github.io/ide/layers_transporte/linea_21_data.js"></script>
+<script src="https://agstnrdz.github.io/ide/layers_transporte/linea_22_data.js"></script>
+<script src="https://agstnrdz.github.io/ide/layers_transporte/paradas_data.js"></script>
 <script>
 (function () {
 "use strict";
 
-/* ── Datos: verificación de carga ─────────────────────────────── */
-if (!window.LINEAS_DATA || !window.PARADAS_DATA) {
+/* ══════════════════════════════════════════════════════════════════
+   Armado de datos: lee los 23 window.LINEA_*_DATA (GeoJSON crudo)
+   y los convierte al formato interno del visor. Cada archivo es una
+   línea propia; NO se fusionan (6H, 6AH, 8H y 8AH van separadas).
+   ══════════════════════════════════════════════════════════════════ */
+const IDS_LINEAS = ["1","2","3","4","5","5U","6H","6AH","7","8H","8AH","9",
+                    "12","13","14","15","16","17","18","19","20","21","22"];
+
+/* Paleta (color claro / color modo oscuro) por línea */
+const PALETA = {
+  "1":  ["#d62728", "#ff6b6b"], "2":  ["#1f77b4", "#5aa9e6"],
+  "3":  ["#2ca02c", "#5fd068"], "4":  ["#9467bd", "#b78fe0"],
+  "5":  ["#ff7f0e", "#ffa94d"], "5U": ["#8c564b", "#c9938a"],
+  "6H": ["#e377c2", "#f2a6dd"], "6AH": ["#8e44ad", "#c39bd3"],
+  "7":  ["#17becf", "#63dfee"],
+  "8H": ["#bcbd22", "#d9db4f"], "8AH": ["#6b8e23", "#9acd32"],
+  "9":  ["#7f2704", "#d95f02"],
+  "12": ["#0d5b8c", "#4fa3d1"], "13": ["#a61e4d", "#e64980"],
+  "14": ["#2b8a3e", "#69db7c"], "15": ["#5f3dc4", "#9775fa"],
+  "16": ["#e8590c", "#ff922b"], "17": ["#0b7285", "#3bc9db"],
+  "18": ["#862e9c", "#cc5de8"], "19": ["#c92a2a", "#ff8787"],
+  "20": ["#364fc7", "#748ffc"], "21": ["#087f5b", "#38d9a9"],
+  "22": ["#e67700", "#ffc078"],
+};
+
+const SENTIDOS = {
+  ida: ["Ida", "ida"], vuelta: ["Vuelta", "vuelta"],
+  horario: ["Horario", "circular"], antihorario: ["Antihorario", "circular"],
+  "": ["Único", "unico"],
+};
+const ORDEN_SENT = { ida: 0, vuelta: 1, horario: 0, antihorario: 1, "": 0 };
+
+/* Cosido de tramos del MultiLineString: encadena fin→inicio por
+   proximidad SIN invertir tramos (digitalizados en sentido de
+   circulación). Si el hueco supera GAP_MAX m, corta en otro path. */
+const GAP_MAX = 150;
+function distM(a, b) { /* a,b = [lng,lat] */
+  const kx = 111320 * Math.cos(-45.86 * Math.PI / 180);
+  return Math.hypot((a[0] - b[0]) * kx, (a[1] - b[1]) * 111320);
+}
+function coser(parts) {
+  if (parts.length === 1) return [parts[0]];
+  let mejor = null, mejorCosto = Infinity;
+  for (let inicio = 0; inicio < parts.length; inicio++) {
+    const usados = new Set([inicio]);
+    const orden = [inicio];
+    let costo = 0;
+    while (usados.size < parts.length) {
+      const ult = parts[orden[orden.length - 1]];
+      const fin = ult[ult.length - 1];
+      let cand = -1, cd = Infinity;
+      for (let i = 0; i < parts.length; i++) {
+        if (usados.has(i)) continue;
+        const d = distM(fin, parts[i][0]);
+        if (d < cd) { cd = d; cand = i; }
+      }
+      costo += cd;
+      usados.add(cand);
+      orden.push(cand);
+    }
+    if (costo < mejorCosto) { mejorCosto = costo; mejor = orden; }
+  }
+  const paths = [];
+  let actual = parts[mejor[0]].slice();
+  for (let k = 1; k < mejor.length; k++) {
+    const seg = parts[mejor[k]];
+    if (distM(actual[actual.length - 1], seg[0]) > GAP_MAX) {
+      paths.push(actual);
+      actual = seg.slice();
+    } else {
+      actual = actual.concat(seg);
+    }
+  }
+  paths.push(actual);
+  return paths;
+}
+
+const LINEAS_DATA = [];
+const faltantes = [];
+for (const id of IDS_LINEAS) {
+  const gj = window["LINEA_" + id + "_DATA"];
+  if (!gj || !gj.features || !gj.features.length) { faltantes.push(id); continue; }
+  const rutas = [];
+  let nombre = "";
+  for (const ft of gj.features) {
+    const p = ft.properties || {};
+    const g = ft.geometry;
+    if (!g) continue;
+    const sent = String(p.sentido || "").trim().toLowerCase();
+    const def = SENTIDOS[sent] || [sent.charAt(0).toUpperCase() + sent.slice(1) || "Único", "ida"];
+    const parts = (g.type === "MultiLineString" ? g.coordinates : [g.coordinates])
+      .filter((t) => t && t.length >= 2);
+    if (!parts.length) continue;
+    /* GeoJSON [lng,lat(,z)] → Leaflet [lat,lng] */
+    const paths = coser(parts).map((path) => path.map((pt) => [pt[1], pt[0]]));
+    rutas.push({
+      id: id + "-" + (sent || "unico"),
+      sentido: def[0], tipo: def[1],
+      _orden: ORDEN_SENT[sent] != null ? ORDEN_SENT[sent] : 9,
+      paths,
+    });
+    const nom = String(p.nombre || "").trim();
+    if (nom && (!nombre || sent === "ida" || sent === "horario" || sent === "")) nombre = nom;
+  }
+  if (!rutas.length) { faltantes.push(id); continue; }
+  rutas.sort((a, b) => a._orden - b._orden);
+  const pal = PALETA[id] || ["#555555", "#aaaaaa"];
+  LINEAS_DATA.push({ id, nombre, color: pal[0], colorDark: pal[1], rutas });
+}
+const PARADAS_DATA = Array.isArray(window.PARADAS_DATA) ? window.PARADAS_DATA : [];
+
+if (!LINEAS_DATA.length) {
   document.getElementById("mapa").innerHTML =
-    '<p style="padding:24px">No se pudieron cargar los datos remotos ' +
-    '(lineas_data.js / paradas_data.js). Verificá la conexión o las URLs del repositorio.</p>';
+    '<p style="padding:24px">No se pudieron cargar los datos remotos de líneas ' +
+    '(linea_*_data.js). Verificá la conexión o las URLs del repositorio.</p>';
   return;
 }
-const LINEAS_DATA = window.LINEAS_DATA;
-const PARADAS_DATA = window.PARADAS_DATA;
+
 const CONT = document.getElementById("visor-transporte");
 
-/* ── Tema ─────────────────────────────────────────────────────── */
+/* ── Tema (claro por defecto) ─────────────────────────────────── */
 const TEMA_KEY = "transporte-tema";
 function temaActual() {
   return CONT.getAttribute("data-theme") === "dark" ? "dark" : "light";
@@ -614,8 +761,7 @@ function aplicarTema(tema) {
 (function initTema() {
   let guardado = null;
   try { guardado = localStorage.getItem(TEMA_KEY); } catch (e) { /* noop */ }
-  const preferido = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  aplicarTema(guardado || preferido);
+  aplicarTema(guardado === "dark" ? "dark" : "light");
 })();
 
 /* ── Utilidades ───────────────────────────────────────────────── */
@@ -639,7 +785,7 @@ function toast(msg, ms = 4000) {
 }
 
 /* ── Mapa base ────────────────────────────────────────────────── */
-const ATTR = "Instituto Geográfico Nacional + OpenStreetMap | Fuente: DGT · Procesamiento: Modernización e Investigación Territorial";
+const ATTR = "Instituto Geográfico Nacional + OpenStreetMap";
 const mapa = L.map("mapa", { zoomControl: false, attributionControl: true });
 mapa.attributionControl.setPrefix(false);
 L.control.zoom({ position: "bottomright" }).addTo(mapa);
@@ -655,7 +801,7 @@ const capaSatelite = L.tileLayer(
   "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
   { maxZoom: 20, attribution: "Imágenes © Google | " + ATTR });
 
-let baseActiva = "mapa"; // 'mapa' | 'satelite'
+let baseActiva = "mapa"; // 'mapa' (Argenmap) | 'satelite' (Google)
 function capaBase() {
   if (baseActiva === "satelite") return capaSatelite;
   return temaActual() === "dark" ? capaArgenmapOscuro : capaArgenmapClaro;
@@ -692,9 +838,8 @@ const lineaPorId = new Map(LINEAS_DATA.map((l) => [l.id, l]));
 
 function tooltipLinea(linea, ruta) {
   const fg = colorChipTexto(colorLinea(linea));
-  const cartel = ruta.cartel || linea.nombre;
   return `<span class="tt-chip" style="background:${colorLinea(linea)};color:${fg}">${esc(linea.id)}</span>` +
-         `<strong>${esc(cartel)}</strong><br><span class="tt-sub">${esc(ruta.sentido)} · tocá para enfocar</span>`;
+         `<strong>${esc(linea.nombre || "Línea " + linea.id)}</strong><br><span class="tt-sub">${esc(ruta.sentido)} · tocá para enfocar</span>`;
 }
 
 for (const linea of LINEAS_DATA) {
@@ -851,7 +996,7 @@ function boundsDeLinea(id) {
   return b;
 }
 
-/* ── Caja de capas: lista de líneas ───────────────────────────── */
+/* ── Solapa: lista de líneas ──────────────────────────────────── */
 const listaLineas = document.getElementById("lista-lineas");
 const filasPorId = new Map();
 
@@ -864,7 +1009,7 @@ for (const linea of LINEAS_DATA) {
   li.dataset.id = linea.id;
   const fg = colorChipTexto(linea.color);
   const pills = linea.rutas.map((r) =>
-    `<button class="pill sentido activo" data-ruta="${esc(r.id)}" title="${esc(r.cartel || linea.nombre)}">` +
+    `<button class="pill sentido activo" data-ruta="${esc(r.id)}" title="${esc(linea.nombre || "Línea " + linea.id)}">` +
     `${FLECHAS[r.tipo] || "→"} ${esc(r.sentido)}</button>`
   ).join("");
   li.innerHTML =
@@ -1040,7 +1185,7 @@ CONT.querySelectorAll(".filtro-fila").forEach((fila) => {
   });
 });
 
-/* ── Mapa base: botones de la caja ────────────────────────────── */
+/* ── Mapa base: botón Argenmap / Satelital ────────────────────── */
 document.getElementById("btn-base-mapa").addEventListener("click", () => {
   baseActiva = "mapa";
   document.getElementById("btn-base-mapa").classList.add("activo");
@@ -1052,6 +1197,21 @@ document.getElementById("btn-base-sat").addEventListener("click", () => {
   document.getElementById("btn-base-sat").classList.add("activo");
   document.getElementById("btn-base-mapa").classList.remove("activo");
   actualizarBase();
+});
+
+/* ── Pantalla completa ────────────────────────────────────────── */
+document.getElementById("btn-fs").addEventListener("click", () => {
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
+  } else if (CONT.requestFullscreen) {
+    CONT.requestFullscreen().catch(() =>
+      toast("El navegador bloqueó la pantalla completa. Si el visor está incrustado, el iframe necesita el atributo allowfullscreen."));
+  } else {
+    toast("Este navegador no soporta pantalla completa.");
+  }
+});
+document.addEventListener("fullscreenchange", () => {
+  setTimeout(() => mapa.invalidateSize(), 120);
 });
 
 /* ── Geolocalización ──────────────────────────────────────────── */
@@ -1114,7 +1274,7 @@ function ubicarme() {
         li.appendChild(btn);
         ol.appendChild(li);
       }
-      document.getElementById("tarjeta-cercanas").hidden = false;
+      document.getElementById("tarjeta-cercanas").hidden = !cercanas.length;
       mapa.flyTo(aqui, Math.max(mapa.getZoom(), 15), { duration: 0.8 });
     },
     (err) => {
@@ -1141,7 +1301,7 @@ const CtrlAcciones = L.Control.extend({
         `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="8"/><path d="M12 1.5V4m0 16v2.5M1.5 12H4m16 0h2.5"/></svg>` +
       `</button>` +
       `<button id="btn-encuadre" title="Ver toda la red" aria-label="Ver toda la red">` +
-        `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>` +
+        `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>` +
       `</button>`;
     L.DomEvent.disableClickPropagation(div);
     return div;
@@ -1195,6 +1355,9 @@ reestilarChips();
 mapa.fitBounds(boundsRed, { padding: [24, 24] });
 aplicarFiltrosParadas();
 actualizarPanelFoco();
+if (faltantes.length) {
+  toast(`Atención: no se pudieron cargar ${faltantes.length} líneas (${faltantes.join(", ")}).`, 8000);
+}
 })();
 </script>
 <!-- ═══════════ FIN BLOQUE ═══════════ -->
