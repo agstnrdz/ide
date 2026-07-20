@@ -80,6 +80,7 @@
 .vt-header-texto p  { margin: 2px 0 0; font-size: 12.5px; opacity: 0.9; }
 .vt-header .logo { height: 44px; width: auto; flex-shrink: 0; margin-left: auto; }
 .vt-btn-header {
+  position: relative !important;
   width: 34px; height: 34px;
   display: grid; place-items: center;
   border-radius: 9px;
@@ -89,8 +90,26 @@
   transition: background 0.15s;
 }
 .vt-btn-header:hover { background: rgba(255,255,255,0.12); }
-#visor-transporte[data-theme="dark"] .icono-luna { display: none; }
-#visor-transporte:not([data-theme="dark"]) .icono-sol { display: none; }
+/* Centrado a prueba del CSS del sitio anfitrión (WordPress/Elementor):
+   se posiciona por coordenadas propias, no por el layout heredado del
+   botón, así un reset externo de line-height/padding/width no lo corre.
+   OJO: acá no se toca "display", porque un display:none (abajo) siempre
+   debe poder ganar; forzarlo a "block" fue lo que la vez pasada hizo que
+   los dos íconos (sol y luna) quedaran superpuestos. */
+.vt-btn-header svg {
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  width: 18px !important;
+  height: 18px !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: translate(-50%, -50%) !important;
+}
+#visor-transporte[data-theme="dark"] .icono-luna { display: none !important; }
+#visor-transporte:not([data-theme="dark"]) .icono-sol { display: none !important; }
 
 /* ══ Cuerpo: mapa a ancho completo ══ */
 .vt-cuerpo { position: relative; height: 800px; background: var(--mapa-fondo); }
@@ -136,7 +155,7 @@
   border-radius: 6px;
   background: color-mix(in srgb, var(--ink-1) 16%, var(--panel));
 }
-.caja-head .stats { font-size: 10px; color: var(--muted); margin-left: auto; }
+.caja-head .stats { font-size: 11.5px; color: #383838; margin-left: auto; }
 .btn-plegar {
   width: 26px; height: 26px;
   display: grid; place-items: center;
@@ -235,7 +254,7 @@
   border-radius: 7px;
   background: var(--c);
   color: var(--chip-fg, #fff);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: -0.02em;
   flex-shrink: 0;
@@ -353,9 +372,9 @@
 }
 #visor-transporte .leaflet-bar a:hover { background: var(--hover-wash); }
 #visor-transporte .leaflet-control-attribution {
-  background: color-mix(in srgb, var(--panel) 85%, transparent) !important;
+  background: color-mix(in srgb, var(--panel) 95%, transparent) !important;
   color: var(--muted) !important;
-  font-size: 10px !important;
+  font-size: 11px !important;
 }
 #visor-transporte .leaflet-control-attribution a { color: var(--ink-2) !important; }
 #visor-transporte .leaflet-control-scale-line {
@@ -1387,7 +1406,7 @@ reestilarChips();
 (function initStats() {
   const nRutas = LINEAS_DATA.reduce((acc, l) => acc + l.rutas.length, 0);
   document.getElementById("stats-row").textContent =
-    `${LINEAS_DATA.length} líneas · ${nRutas} recorridos · ${PARADAS_DATA.length} paradas`;
+    `${LINEAS_DATA.length} líneas · ${PARADAS_DATA.length} paradas`;
 })();
 
 mapa.fitBounds(boundsRed, { padding: [24, 24] });
