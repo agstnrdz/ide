@@ -797,6 +797,15 @@ function colorChipTexto(hex) {
   return L > 0.36 ? "#0b0b0b" : "#ffffff";
 }
 function colorLinea(linea) { return temaActual() === "dark" ? linea.colorDark : linea.color; }
+/* Versión atenuada (mezclada con blanco) sólo para el ícono/chip del número
+   de línea — el color real de la línea en el mapa no cambia. */
+function atenuar(hex, t = 0.28) {
+  const n = parseInt(hex.slice(1), 16);
+  const mezcla = (c) => Math.round(c * (1 - t) + 255 * t);
+  const r = mezcla(n >> 16), g = mezcla((n >> 8) & 255), b = mezcla(n & 255);
+  return "#" + [r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("");
+}
+function colorChip(linea) { return atenuar(colorLinea(linea)); }
 function fmtDist(m) { return m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1)} km`; }
 function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
@@ -862,8 +871,9 @@ const rutasPorLinea = new Map();
 const lineaPorId = new Map(LINEAS_DATA.map((l) => [l.id, l]));
 
 function tooltipLinea(linea, ruta) {
-  const fg = colorChipTexto(colorLinea(linea));
-  return `<span class="tt-chip" style="background:${colorLinea(linea)};color:${fg}">${esc(linea.id)}</span>` +
+  const cChip = colorChip(linea);
+  const fg = colorChipTexto(cChip);
+  return `<span class="tt-chip" style="background:${cChip};color:${fg}">${esc(linea.id)}</span>` +
          `<strong>${esc(linea.nombre || "Línea " + linea.id)}</strong><br><span class="tt-sub">${esc(ruta.sentido)} · tocá para enfocar</span>`;
 }
 
@@ -1032,14 +1042,15 @@ for (const linea of LINEAS_DATA) {
   const li = document.createElement("li");
   li.className = "linea-row";
   li.dataset.id = linea.id;
-  const fg = colorChipTexto(linea.color);
+  const cChip = atenuar(linea.color);
+  const fg = colorChipTexto(cChip);
   const pills = linea.rutas.map((r) =>
     `<button class="pill sentido activo" data-ruta="${esc(r.id)}" aria-pressed="true" title="${esc(linea.nombre || "Línea " + linea.id)}">` +
     `${FLECHAS[r.tipo] || "→"} ${esc(r.sentido)}</button>`
   ).join("");
   li.innerHTML =
     `<div class="linea-main">` +
-      `<span class="chip" style="--c:${linea.color};--chip-fg:${fg}">${esc(linea.id)}</span>` +
+      `<span class="chip" style="--c:${cChip};--chip-fg:${fg}">${esc(linea.id)}</span>` +
       `<span class="linea-nombre">${esc(linea.nombre)}</span>` +
       `<button class="btn-ojo" title="Mostrar u ocultar línea ${esc(linea.id)}" aria-label="Mostrar u ocultar línea ${esc(linea.id)}">${ICONO_OJO}</button>` +
     `</div>` +
@@ -1356,7 +1367,7 @@ mapa.on("click", () => { if (estado.enfocada) desenfocar(); });
 /* ── Tema: botón ──────────────────────────────────────────────── */
 function reestilarChips() {
   for (const [id, li] of filasPorId) {
-    const c = colorLinea(lineaPorId.get(id));
+    const c = colorChip(lineaPorId.get(id));
     const chip = li.querySelector(".chip");
     chip.style.setProperty("--c", c);
     chip.style.setProperty("--chip-fg", colorChipTexto(c));
